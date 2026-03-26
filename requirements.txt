@@ -1,0 +1,10 @@
+# ros2reaper framework dependencies
+# All other modules use Python standard library only
+
+# Optional: required for amplification.py (RTPS reflection/amplification testing)
+# If not installed, amplification module will degrade gracefully
+scapy>=2.5.0
+
+# NOTE: rclpy is NOT pip-installable — it is provided by your ROS 2 installation.
+# Install ROS 2 (Humble, Iron, Jazzy, etc.) and source the setup script:
+#   source /opt/ros/<distro>/setup.bash
