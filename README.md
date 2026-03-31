@@ -9,10 +9,10 @@
   ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 ```
 
-**DDS/RTPS + ROS 1 Offensive Security Assessment Framework**
+**DDS/RTPS + ROS 1 + ICS/OT Bridge Offensive Security Assessment Framework**
 
-> Author: Gh057x | v0.3.0-alpha
-> Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic)
+> Author: Gh057x | v0.4.0-alpha
+> Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic) · ICS/OT (Modbus, DNP3, OPC UA, MQTT, EtherCAT, AWS IoT)
 
 ---
 
@@ -33,12 +33,13 @@
 
 ROS2Reaper is a modular offensive security toolkit for assessing ROS 2 and ROS 1 robotic deployments. It targets the underlying DDS/RTPS transport layer — the communication backbone of ROS 2 — as well as the legacy ROS 1 rosmaster XML-RPC interface.
 
-The framework is split into two phases:
+The framework is split into three phases:
 
 | Phase | Description |
 |-------|-------------|
 | **Phase 1 — Reconnaissance** | Passive/active discovery, fingerprinting, enumeration, and security auditing |
 | **Phase 2 — Exploitation** | Topic injection, node impersonation, RTPS amplification, and parameter manipulation |
+| **Phase 3 — ICS/OT Bridge Analysis** | Attack surface analysis for DDS bridges to Modbus, DNP3, OPC UA, MQTT, EtherCAT, and AWS IoT Greengrass |
 
 ---
 
@@ -59,10 +60,18 @@ ros2reaper_framework/
     ├── topic_injection.py     # ROS 2 topic injection attacks
     ├── node_impersonation.py  # Node impersonation & TF poisoning
     ├── amplification.py       # RTPS amplification & robustness testing
+    ├── rosbridge.py           # rosbridge WebSocket enumeration/injection/audit
     ├── ros1_enum.py           # ROS1 node/topic/param enumeration
     ├── ros1_injection.py      # ROS1 TCPROS topic injection
     ├── ros1_exploitation.py   # ROS1 node killing & parameter manipulation
-    └── ros1_audit.py          # ROS1 security configuration auditing
+    ├── ros1_audit.py          # ROS1 security configuration auditing
+    └── phase3/
+        ├── ics_dds_enum.py        # ICS/OT context-aware DDS enumeration
+        ├── modbus_dnp3_bridge.py  # Modbus/DNP3 ↔ DDS bridge analysis
+        ├── mqtt_ethercat_bridge.py # MQTT/EtherCAT ↔ DDS bridge analysis
+        ├── opcua_dds_bridge.py    # OPC UA ↔ DDS bridge analysis
+        ├── aws_iot_bridge.py      # AWS IoT Greengrass ↔ DDS bridge analysis
+        └── shodan_dds.py          # Internet-wide DDS exposure via Shodan
 ```
 
 ---
@@ -75,7 +84,12 @@ cd ros2reaper_framework
 pip install -r requirements.txt
 ```
 
-> ROS 2 exploitation modules (`inject`, `impersonate`) require `rclpy` and a sourced ROS 2 environment. All Phase 1 reconnaissance modules work with no ROS dependency.
+> ROS 2 exploitation modules (`inject`, `impersonate`) require `rclpy` and a sourced ROS 2 environment. All Phase 1 and Phase 3 modules work with no ROS dependency.
+>
+> Phase 3 optional dependencies (all gracefully degraded if missing):
+> ```bash
+> pip install shodan paho-mqtt pymodbus requests asyncua
+> ```
 
 ---
 
@@ -98,6 +112,25 @@ python3 ros2reaper.py <command> [options]
 | `-v`, `--verbose` | Verbose output |
 | `--skip-auth` | Skip authorization prompt (for scripting) |
 | `--no-banner` | Suppress ASCII banner |
+
+**Phase 3 options:**
+
+| Flag | Description |
+|------|-------------|
+| `--threads` | Concurrent scan threads (default: 50) |
+| `--deep` | Enable deep probing / protocol coexistence detection |
+| `--context` | ICS sector bias: `scada`, `atc`, `automotive`, `smart_grid`, `military`, `medical`, `iiot` |
+| `--passive` | Passive multicast listener mode — no probes sent (`ics-enum`) |
+| `--passive-duration` | Passive listen duration in seconds (default: 30.0) |
+| `--modbus-enumerate` | Enumerate Modbus unit IDs and test write access |
+| `--mqtt-enumerate` | Full MQTT wildcard topic enumeration (requires `paho-mqtt`) |
+| `--enum-duration` | MQTT topic listen duration in seconds (default: 10.0) |
+| `--enumerate-nodes` | Browse OPC UA address space for DDS bridge indicators |
+| `--shadow-enumerate` | Probe AWS IoT Shadow/Jobs topics on discovered brokers |
+| `--api-key` | Shodan API key (or set env `SHODAN_API_KEY`) |
+| `--limit` | Max Shodan results per query (default: 100) |
+| `--rate` | Seconds between Shodan API calls (default: 1.0) |
+| `--export` | Export discovered IP list from Shodan results to file |
 
 ---
 
@@ -357,6 +390,114 @@ python3 ros2reaper.py ros1-exploit --target 192.168.1.10 --param-key /max_speed 
 
 # Dump all parameters
 python3 ros2reaper.py ros1-exploit --target 192.168.1.10 --skip-auth
+```
+
+---
+
+## Phase 3 — ICS/OT Bridge Analysis
+
+> No ROS installation required. All modules operate at the raw socket/TCP level.
+
+Phase 3 targets environments where DDS/ROS 2 is bridged to industrial control system protocols. Each module discovers protocol co-existence, maps the bridge attack surface, and generates scored attack scenarios with CVSS ratings.
+
+---
+
+### `ics-enum` — ICS/OT Context-Aware DDS Enumeration
+
+Classifies DDS deployments operating in non-robotics ICS/OT contexts: SCADA, air traffic control, automotive, smart grid, military, medical, and IIoT. Performs passive multicast listening or active SPDP probing with Bayesian context inference.
+
+```bash
+# Active scan — single target, SCADA context
+python3 ros2reaper.py ics-enum --target 10.0.0.1 --deep --context scada --skip-auth
+
+# Network sweep
+python3 ros2reaper.py ics-enum --network 10.0.0.0/24 --deep -o ics.json --skip-auth
+
+# Passive mode — no packets sent (stealth)
+python3 ros2reaper.py ics-enum --passive --passive-duration 60 --skip-auth
+```
+
+---
+
+### `modbus-scan` — Modbus/DNP3 ↔ DDS Bridge Analysis
+
+Detects hosts running DDS alongside Modbus TCP (legacy SCADA) or DNP3 (power grid protocols). Maps bridge attack surface with scored scenarios including coil/register write injection, historian poisoning, and alarm suppression (max CVSS 9.8).
+
+```bash
+python3 ros2reaper.py modbus-scan --target 10.0.0.1 --deep --modbus-enumerate --skip-auth
+python3 ros2reaper.py modbus-scan --network 10.0.0.0/24 -o modbus.json --skip-auth
+```
+
+---
+
+### `mqtt-scan` — MQTT/EtherCAT ↔ DDS Bridge Analysis
+
+Detects DDS alongside MQTT (IIoT edge-cloud) or EtherCAT (real-time fieldbus). Enumerates MQTT topics via wildcard subscription, parses Sparkplug B payloads, detects known bridge products (RTI, Zenoh, EMQX, Azure IoT Edge), and maps PDO data poisoning and topic injection scenarios (max CVSS 9.8).
+
+```bash
+python3 ros2reaper.py mqtt-scan --target 10.0.0.1 --deep --mqtt-enumerate --skip-auth
+python3 ros2reaper.py mqtt-scan --network 10.0.0.0/24 -o mqtt.json --skip-auth
+```
+
+---
+
+### `opcua-scan` — OPC UA ↔ DDS Bridge Analysis
+
+Detects hosts with both DDS and OPC UA (the dominant ICS data exchange standard). Probes OPC UA endpoints via raw TCP HEL/ACK, enumerates security modes, identifies vendor namespaces (Kepware, OSIsoft PI, Ignition, WinCC, FactoryTalk, etc.), and scores bridge attack scenarios including setpoint injection, alarm suppression, and historian poisoning (max CVSS 9.1).
+
+```bash
+python3 ros2reaper.py opcua-scan --target 10.0.0.1 --deep --enumerate-nodes --skip-auth
+python3 ros2reaper.py opcua-scan --network 10.0.0.0/24 -o opcua.json --skip-auth
+```
+
+---
+
+### `aws-scan` — AWS IoT Greengrass ↔ DDS Bridge Analysis
+
+Detects AWS IoT Greengrass v2 co-located with DDS. Fingerprints Greengrass via DDS participant properties, IPC socket paths, and X.509 Thing ARN exfiltration in SPDP discovery traffic. Maps pivot paths from DDS to AWS cloud via IAM role abuse, Shadow manipulation, and OTA command injection (max CVSS 10.0).
+
+```bash
+python3 ros2reaper.py aws-scan --target 10.0.0.1 --deep --shadow-enumerate --skip-auth
+python3 ros2reaper.py aws-scan --network 10.0.0.0/24 -o aws.json --skip-auth
+```
+
+---
+
+### `shodan-dds` — Internet-Wide DDS Exposure via Shodan
+
+Queries the Shodan API for internet-exposed DDS/RTPS endpoints. Classifies results by ICS sector, DDS vendor, security posture, and domain ID. Exports target IP lists for direct feeding into `ics-enum` and other Phase 3 modules.
+
+```bash
+# Full search campaign
+python3 ros2reaper.py shodan-dds --api-key YOUR_KEY --context scada -o shodan.json --skip-auth
+
+# Single host deep lookup
+python3 ros2reaper.py shodan-dds --api-key YOUR_KEY --target 1.2.3.4 --skip-auth
+
+# Export IP list for ics-enum pipeline
+python3 ros2reaper.py shodan-dds --api-key YOUR_KEY --export targets.txt --skip-auth
+```
+
+> Set `SHODAN_API_KEY` in your environment to avoid passing `--api-key` on every command.
+
+---
+
+### Phase 3 Pipeline
+
+Full ICS/OT assessment workflow:
+
+```bash
+# 1. Internet recon — find exposed DDS endpoints
+python3 ros2reaper.py shodan-dds --api-key $SHODAN_API_KEY --export targets.txt --skip-auth
+
+# 2. ICS context classification
+python3 ros2reaper.py ics-enum --network 10.0.0.0/24 --deep -o ics.json --skip-auth
+
+# 3. Protocol bridge enumeration (run in parallel)
+python3 ros2reaper.py modbus-scan --network 10.0.0.0/24 --deep -o modbus.json --skip-auth
+python3 ros2reaper.py mqtt-scan   --network 10.0.0.0/24 --deep -o mqtt.json   --skip-auth
+python3 ros2reaper.py opcua-scan  --network 10.0.0.0/24 --deep -o opcua.json  --skip-auth
+python3 ros2reaper.py aws-scan    --network 10.0.0.0/24 --deep -o aws.json    --skip-auth
 ```
 
 ---
