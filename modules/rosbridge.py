@@ -588,8 +588,7 @@ class RosbridgeInjector:
         angle_inc = (2 * math.pi) / num_ranges
         msg = {
             "header": {
-                "seq": 0,
-                "stamp": {"secs": int(time.time()), "nsecs": 0},
+                "stamp": {"sec": int(time.time()), "nanosec": 0},
                 "frame_id": "laser",
             },
             "angle_min":       -math.pi,
@@ -624,7 +623,7 @@ class RosbridgeInjector:
 
     def inject_nav_goal(
         self,
-        topic: str = "/move_base_simple/goal",
+        topic: str = "/goal_pose",
         x: float = 0.0,
         y: float = 0.0,
         duration: float = 5.0,
@@ -635,8 +634,7 @@ class RosbridgeInjector:
         """
         msg = {
             "header": {
-                "seq": 0,
-                "stamp": {"secs": int(time.time()), "nsecs": 0},
+                "stamp": {"sec": int(time.time()), "nanosec": 0},
                 "frame_id": "map",
             },
             "pose": {
@@ -693,6 +691,8 @@ class RosbridgeInjector:
             sent = 0
 
             while time.monotonic() < deadline:
+                if "header" in msg:
+                    msg["header"]["stamp"]["sec"] = int(time.time())
                 ws.send_json({"op": "publish", "topic": topic, "msg": msg})
                 sent += 1
                 if self.verbose and sent % 10 == 0:

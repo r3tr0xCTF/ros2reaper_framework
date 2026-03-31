@@ -830,13 +830,14 @@ def cmd_rb_inject(args):
     if mode == "cmd_vel":
         topic = args.topic or "/cmd_vel"
         injector.inject_cmd_vel(topic=topic, preset=args.preset,
+                                 linear_x=args.lx, angular_z=args.az,
                                  duration=args.duration)
     elif mode == "lidar":
         topic = args.topic or "/scan"
         injector.inject_lidar(topic=topic, mode=args.lidar_mode,
                                duration=args.duration)
     elif mode == "nav":
-        topic = args.topic or "/move_base_simple/goal"
+        topic = args.topic or "/goal_pose"
         injector.inject_nav_goal(topic=topic, x=args.x, y=args.y,
                                   duration=args.duration)
     else:
@@ -1348,6 +1349,10 @@ Examples:
                         help="Target node name for impersonation")
     parser.add_argument("--x", type=float, default=5.0, help="X coordinate for nav goal")
     parser.add_argument("--y", type=float, default=5.0, help="Y coordinate for nav goal")
+    parser.add_argument("--lx", type=float, default=None,
+                        help="Override linear.x velocity for cmd_vel injection (m/s)")
+    parser.add_argument("--az", type=float, default=None,
+                        help="Override angular.z velocity for cmd_vel injection (rad/s)")
     parser.add_argument("--lidar-mode", default="allclear",
                         choices=["allclear", "wall", "phantom"],
                         help="LIDAR spoofing mode")
