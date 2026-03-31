@@ -37,6 +37,14 @@ Commands (ROS 2 / DDS):
     impersonate  - Node impersonation (shadow pub, TF poison, DoS, Sybil)
     amplify      - RTPS amplification & robustness testing (no ROS 2 required)
 
+    --- Phase 3: ICS/OT Bridge Analysis ---
+    ics-enum     - ICS/OT context-aware DDS enumeration (SCADA, ATC, automotive, etc.)
+    modbus-scan  - Modbus/DNP3 ↔ DDS bridge attack surface analysis
+    mqtt-scan    - MQTT/EtherCAT ↔ DDS bridge attack surface analysis
+    opcua-scan   - OPC UA ↔ DDS bridge attack surface analysis
+    aws-scan     - AWS IoT Greengrass ↔ DDS bridge attack surface analysis
+    shodan-dds   - Internet-wide DDS exposure search via Shodan API
+
 Commands (ROS 1):
     ros1-discover  - Enumerate ROS1 nodes/topics/params via rosmaster
     ros1-inject    - Inject topics via TCPROS (cmd_vel, LIDAR blind)
@@ -47,6 +55,14 @@ Commands (rosbridge / WebSocket):
     rb-enum        - Enumerate topics/nodes/services/params via rosbridge
     rb-inject      - Inject topics via rosbridge WebSocket (no ROS install needed)
     rb-audit       - Audit rosbridge security posture
+
+Commands (Phase 3: ICS/OT Bridge Analysis):
+    ics-enum       - ICS/OT context-aware DDS enumeration (SCADA, ATC, automotive, etc.)
+    modbus-scan    - Modbus/DNP3 ↔ DDS bridge attack surface analysis
+    mqtt-scan      - MQTT/EtherCAT ↔ DDS bridge attack surface analysis
+    opcua-scan     - OPC UA ↔ DDS bridge attack surface analysis
+    aws-scan       - AWS IoT Greengrass ↔ DDS bridge attack surface analysis
+    shodan-dds     - Internet-wide DDS exposure search via Shodan API
 
 Author: Gh057x
 License: MIT — Use responsibly.
@@ -82,7 +98,7 @@ BANNER = """
   ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 \033[0m
   \033[93mDDS/RTPS Offensive Security Toolkit\033[0m
-  \033[90mAuthor: Gh057x | v0.1.0-alpha\033[0m
+  \033[90mAuthor: Gh057x | v0.4.0-alpha\033[0m
   \033[90mTarget: ROS 2 (Humble/Jazzy) + DDS (Fast DDS, Cyclone, Connext) | ROS 1 (Noetic/Melodic)\033[0m
 """
 
@@ -860,6 +876,171 @@ def cmd_rb_audit(args):
 
 
 # =============================================================================
+# Phase 3: ICS/OT Bridge Commands
+# =============================================================================
+
+def cmd_ics_enum(args):
+    """ICS/OT context-aware DDS enumeration"""
+    from modules.phase3.ics_dds_enum import ICSDDSEnumerator
+    import argparse as _ap
+
+    if not args.target and not args.network and not args.passive:
+        print("[-] Specify --target, --network, or --passive for ics-enum")
+        return
+
+    # Build a namespace that matches ICSDDSEnumerator's expected args
+    p3_args = _ap.Namespace(
+        target=args.target,
+        cidr=args.network,
+        passive=args.passive,
+        domain=args.domain_id,
+        timeout=args.timeout,
+        threads=args.threads,
+        passive_duration=args.passive_duration,
+        deep=args.deep,
+        output=args.output,
+        context=args.context,
+    )
+
+    enumerator = ICSDDSEnumerator(p3_args)
+    enumerator.run()
+
+
+def cmd_modbus_scan(args):
+    """Modbus/DNP3 ↔ DDS bridge analysis"""
+    from modules.phase3.modbus_dnp3_bridge import ModbusDNP3BridgeScanner
+    import argparse as _ap
+
+    if not args.target and not args.network:
+        print("[-] Specify --target or --network for modbus-scan")
+        return
+
+    p3_args = _ap.Namespace(
+        target=args.target,
+        cidr=args.network,
+        timeout=args.timeout,
+        threads=args.threads,
+        deep=args.deep,
+        modbus_enumerate=args.modbus_enumerate,
+        output=args.output,
+    )
+
+    scanner = ModbusDNP3BridgeScanner(p3_args)
+    scanner.run()
+
+
+def cmd_mqtt_scan(args):
+    """MQTT/EtherCAT ↔ DDS bridge analysis"""
+    from modules.phase3.mqtt_ethercat_bridge import MQTTEtherCATBridgeScanner
+    import argparse as _ap
+
+    if not args.target and not args.network:
+        print("[-] Specify --target or --network for mqtt-scan")
+        return
+
+    p3_args = _ap.Namespace(
+        target=args.target,
+        cidr=args.network,
+        timeout=args.timeout,
+        threads=args.threads,
+        deep=args.deep,
+        mqtt_enumerate=args.mqtt_enumerate,
+        enum_duration=args.enum_duration,
+        output=args.output,
+    )
+
+    scanner = MQTTEtherCATBridgeScanner(p3_args)
+    scanner.run()
+
+
+def cmd_opcua_scan(args):
+    """OPC UA ↔ DDS bridge analysis"""
+    from modules.phase3.opcua_dds_bridge import OpcuaDDSBridgeScanner
+    import argparse as _ap
+
+    if not args.target and not args.network:
+        print("[-] Specify --target or --network for opcua-scan")
+        return
+
+    p3_args = _ap.Namespace(
+        target=args.target,
+        cidr=args.network,
+        timeout=args.timeout,
+        threads=args.threads,
+        deep=args.deep,
+        enumerate_nodes=args.enumerate_nodes,
+        output=args.output,
+    )
+
+    scanner = OpcuaDDSBridgeScanner(p3_args)
+    scanner.run()
+
+
+def cmd_aws_scan(args):
+    """AWS IoT Greengrass ↔ DDS bridge analysis"""
+    from modules.phase3.aws_iot_bridge import AWSIoTBridgeScanner
+    import argparse as _ap
+
+    if not args.target and not args.network:
+        print("[-] Specify --target or --network for aws-scan")
+        return
+
+    p3_args = _ap.Namespace(
+        target=args.target,
+        cidr=args.network,
+        timeout=args.timeout,
+        threads=args.threads,
+        deep=args.deep,
+        shadow_enumerate=args.shadow_enumerate,
+        output=args.output,
+    )
+
+    scanner = AWSIoTBridgeScanner(p3_args)
+    scanner.run()
+
+
+def cmd_shodan_dds(args):
+    """Internet-wide DDS exposure search via Shodan"""
+    from modules.phase3.shodan_dds import ShodanDDSScanner
+
+    api_key = args.api_key or os.environ.get("SHODAN_API_KEY", "")
+    if not api_key:
+        print("[-] Shodan API key required: --api-key KEY or env SHODAN_API_KEY")
+        return
+
+    scanner = ShodanDDSScanner(api_key=api_key, rate_limit=args.rate)
+
+    if args.target:
+        # Single host deep lookup
+        print(f"[*] Shodan host lookup: {args.target}")
+        result = scanner.lookup_host(args.target)
+        print(json.dumps(result, indent=2, default=str))
+        if args.output:
+            with open(args.output, "w") as f:
+                json.dump(result, f, indent=2, default=str)
+            print(f"[*] Result saved to {args.output}")
+    else:
+        # Full search campaign
+        print(f"[*] Running Shodan DDS search campaign (limit {args.limit}/query)...")
+        result = scanner.run_search_campaign(
+            max_per_query=args.limit,
+            context_filter=args.context,
+        )
+        if args.output:
+            with open(args.output, "w") as f:
+                json.dump(result.__dict__ if hasattr(result, "__dict__") else result,
+                          f, indent=2, default=str)
+            print(f"[*] Results saved to {args.output}")
+        if args.export:
+            hosts = []
+            if hasattr(result, "hits"):
+                hosts = [h.ip for h in result.hits if hasattr(h, "ip")]
+            with open(args.export, "w") as f:
+                f.write("\n".join(hosts))
+            print(f"[*] {len(hosts)} IPs exported to {args.export}")
+
+
+# =============================================================================
 # Output Formatters
 # =============================================================================
 
@@ -1102,6 +1283,22 @@ Examples:
   python3 ros2reaper.py rb-inject  --target 192.168.1.10 --attack-mode lidar --lidar-mode allclear --skip-auth
   python3 ros2reaper.py rb-inject  --target 192.168.1.10 --attack-mode nav --x 10 --y 5 --skip-auth
   python3 ros2reaper.py rb-inject  --target 192.168.1.10 --rb-port 9090 --topic /cmd_vel --preset fullspeed --skip-auth
+
+  # Phase 3: ICS/OT Bridge Analysis
+  python3 ros2reaper.py ics-enum   --target 10.0.0.1 --deep --context scada --skip-auth
+  python3 ros2reaper.py ics-enum   --network 10.0.0.0/24 --deep -o ics.json --skip-auth
+  python3 ros2reaper.py ics-enum   --passive --passive-duration 60 --skip-auth
+  python3 ros2reaper.py modbus-scan --target 10.0.0.1 --deep --modbus-enumerate --skip-auth
+  python3 ros2reaper.py modbus-scan --network 10.0.0.0/24 -o modbus.json --skip-auth
+  python3 ros2reaper.py mqtt-scan  --target 10.0.0.1 --deep --mqtt-enumerate --skip-auth
+  python3 ros2reaper.py mqtt-scan  --network 10.0.0.0/24 -o mqtt.json --skip-auth
+  python3 ros2reaper.py opcua-scan --target 10.0.0.1 --deep --enumerate-nodes --skip-auth
+  python3 ros2reaper.py opcua-scan --network 10.0.0.0/24 -o opcua.json --skip-auth
+  python3 ros2reaper.py aws-scan   --target 10.0.0.1 --deep --shadow-enumerate --skip-auth
+  python3 ros2reaper.py aws-scan   --network 10.0.0.0/24 -o aws.json --skip-auth
+  python3 ros2reaper.py shodan-dds --api-key YOUR_KEY --context scada -o shodan.json --skip-auth
+  python3 ros2reaper.py shodan-dds --api-key YOUR_KEY --target 1.2.3.4 --skip-auth
+  python3 ros2reaper.py shodan-dds --api-key YOUR_KEY --export targets.txt --skip-auth
         """,
     )
 
@@ -1114,7 +1311,10 @@ Examples:
                                  "ros1-discover", "ros1-inject",
                                  "ros1-exploit", "ros1-audit",
                                  # rosbridge / WebSocket
-                                 "rb-enum", "rb-inject", "rb-audit"],
+                                 "rb-enum", "rb-inject", "rb-audit",
+                                 # Phase 3: ICS/OT Bridge Analysis
+                                 "ics-enum", "modbus-scan", "mqtt-scan",
+                                 "opcua-scan", "aws-scan", "shodan-dds"],
                         help="Command to execute")
 
     # Target options
@@ -1172,6 +1372,45 @@ Examples:
     parser.add_argument("--kill-all", action="store_true",
                         help="Kill all nodes on the ROS1 master")
 
+    # Phase 3: ICS/OT options
+    parser.add_argument("--threads", type=int, default=50,
+                        help="Concurrent scan threads for Phase 3 modules (default: 50)")
+    parser.add_argument("--passive", action="store_true",
+                        help="Passive multicast listener mode (ics-enum, no probes sent)")
+    parser.add_argument("--passive-duration", type=float, default=30.0,
+                        dest="passive_duration",
+                        help="Passive listen duration in seconds (default: 30.0)")
+    parser.add_argument("--deep", action="store_true",
+                        help="Enable deep probing / protocol coexistence detection")
+    parser.add_argument("--context",
+                        choices=["scada", "atc", "automotive", "smart_grid",
+                                 "military", "medical", "iiot"],
+                        default=None,
+                        help="ICS sector context bias for classification/filtering")
+    parser.add_argument("--modbus-enumerate", action="store_true",
+                        dest="modbus_enumerate",
+                        help="Enumerate Modbus unit IDs and test write access")
+    parser.add_argument("--mqtt-enumerate", action="store_true",
+                        dest="mqtt_enumerate",
+                        help="Full MQTT wildcard topic enumeration (requires paho-mqtt)")
+    parser.add_argument("--enum-duration", type=float, default=10.0,
+                        dest="enum_duration",
+                        help="MQTT topic listen duration in seconds (default: 10.0)")
+    parser.add_argument("--enumerate-nodes", action="store_true",
+                        dest="enumerate_nodes",
+                        help="Browse OPC UA address space for DDS bridge indicators")
+    parser.add_argument("--shadow-enumerate", action="store_true",
+                        dest="shadow_enumerate",
+                        help="Probe AWS IoT Shadow/Jobs topics on discovered brokers")
+    parser.add_argument("--api-key", default=None,
+                        help="Shodan API key (or set env SHODAN_API_KEY)")
+    parser.add_argument("--limit", type=int, default=100,
+                        help="Max Shodan results per query (default: 100)")
+    parser.add_argument("--rate", type=float, default=1.0,
+                        help="Seconds between Shodan API calls (default: 1.0)")
+    parser.add_argument("--export", default=None,
+                        help="Export IP list from Shodan results to file")
+
     # Output options
     parser.add_argument("-o", "--output", help="Output file path (JSON)")
     parser.add_argument("-v", "--verbose", action="store_true",
@@ -1214,6 +1453,13 @@ Examples:
         "rb-enum":       cmd_rb_enum,
         "rb-inject":     cmd_rb_inject,
         "rb-audit":      cmd_rb_audit,
+        # Phase 3: ICS/OT Bridge Analysis
+        "ics-enum":      cmd_ics_enum,
+        "modbus-scan":   cmd_modbus_scan,
+        "mqtt-scan":     cmd_mqtt_scan,
+        "opcua-scan":    cmd_opcua_scan,
+        "aws-scan":      cmd_aws_scan,
+        "shodan-dds":    cmd_shodan_dds,
     }
 
     try:

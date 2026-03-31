@@ -8,3 +8,21 @@ scapy>=2.5.0
 # NOTE: rclpy is NOT pip-installable — it is provided by your ROS 2 installation.
 # Install ROS 2 (Humble, Iron, Jazzy, etc.) and source the setup script:
 #   source /opt/ros/<distro>/setup.bash
+
+# Phase 3: ICS/OT Bridge Analysis (all optional — modules degrade gracefully)
+
+# shodan-dds: internet-wide DDS exposure scanning
+shodan>=1.28.0
+
+# mqtt-scan: MQTT/EtherCAT bridge enumeration
+paho-mqtt>=1.6.1
+
+# opcua-scan: OPC UA / DDS bridge analysis (pick one)
+# asyncua>=1.0.0     # recommended (asyncio-based)
+# opcua>=0.98.13     # legacy sync client
+
+# modbus-scan: Modbus/DNP3 bridge analysis
+pymodbus>=3.5.0
+
+# aws-scan: AWS IoT Greengrass bridge analysis
+requests>=2.31.0
