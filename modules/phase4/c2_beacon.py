@@ -93,17 +93,22 @@ def _handle_sysinfo() -> dict:
 
 
 def _handle_topic_read(topic: str, count: int = 1) -> dict:
-    """Read messages from a ROS 2 topic via CLI."""
+    """Read messages from a ROS 2 topic via CLI.
+    Runs for up to 8 seconds and returns whatever was captured — works across
+    ROS distros that may not support --once (e.g. Galactic).
+    """
     try:
         result = subprocess.run(
-            ["ros2", "topic", "echo", "--once", topic],
-            capture_output=True, timeout=20,
+            ["ros2", "topic", "echo", topic],
+            capture_output=True, timeout=8,
         )
         stdout = result.stdout.decode("utf-8", errors="replace")
         stderr = result.stderr.decode("utf-8", errors="replace")
-        return {"topic": topic, "data": stdout[:4096], "stderr": stderr[:512]}
-    except subprocess.TimeoutExpired:
-        return {"topic": topic, "error": "timeout — no messages received in 20s"}
+        return {"topic": topic, "data": stdout[:4096], "stderr": stderr[:256]}
+    except subprocess.TimeoutExpired as e:
+        # Normal exit path — process killed after timeout, use partial output
+        stdout = (e.stdout or b"").decode("utf-8", errors="replace")
+        return {"topic": topic, "data": stdout[:4096]}
     except Exception as e:
         return {"topic": topic, "error": str(e)}
 
