@@ -53,6 +53,7 @@ The framework is split into five phases covering the full attack lifecycle — f
 ```
 ros2reaper_framework/
 ├── ros2reaper.py          # Main entry point / CLI
+├── ros2reaper_gui.py      # CustomTkinter GUI front-end
 ├── core/
 │   ├── rtps_parser.py     # RTPS packet parser + DDS port calculator
 │   ├── rtps_scanner.py    # SPDP probing, network scanning, passive listening
@@ -124,10 +125,59 @@ pip install -r requirements.txt
 > ```
 >
 > Phase 4 has no additional dependencies — pure Python 3.8+ stdlib only.
+>
+> GUI requires [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter):
+> ```bash
+> pip install customtkinter
+> ```
 
 ---
 
-## Usage
+## GUI
+
+ROS2Reaper ships a full graphical front-end built on CustomTkinter. It wraps the CLI — no import-level coupling — so every command available from the terminal is accessible through the GUI.
+
+```bash
+python3 ros2reaper_gui.py
+```
+
+### Layout
+
+| Pane | Description |
+|------|-------------|
+| **Sidebar** | Phase-grouped command list. Click to select a module. |
+| **Target Bar** | Persistent target profile: IP, network, domain ID, namespace, `--skip-auth`, `--verbose`. Values are applied to the form on execute. Profiles can be saved/loaded/deleted. |
+| **Center Form** | Dynamic argument form generated per command. All CLI flags exposed as typed widgets (text, numeric, bool, dropdown, file browser). Command preview updates live. |
+| **Output Panel** | Tabbed terminal / JSON viewer. Terminal output is syntax-highlighted by line class (`[+]` green, `[!]` red, `[*]` yellow, headings bold). The JSON tab auto-extracts structured data from command output or `-o` files. |
+
+### Features
+
+- **Target Profiles** — save target IP / network / domain ID / namespace as named profiles under `.reaper_profiles/`. Switch between targets without re-entering connection details.
+- **Session Save / Load** — export the current command + all form field values to a JSON file. Reload to resume where you left off.
+- **Live Command Preview** — the exact CLI invocation is shown below the form and updates as you change fields. Copy to clipboard with one click.
+- **Output Export** — export terminal output as `.txt` or parsed JSON data as `.json`.
+- **Abort** — kill a running subprocess mid-execution.
+
+### Supported Commands
+
+The GUI exposes all framework modules across every phase:
+
+| Phase | Modules |
+|-------|---------|
+| Phase 1 — Recon | `discover`, `fingerprint`, `portscan`, `listen`, `portcalc`, `enumerate`, `audit`, `full` |
+| Phase 2 — Exploit | `inject`, `impersonate`, `amplify` |
+| ROS 1 | `ros1-discover`, `ros1-inject`, `ros1-exploit`, `ros1-audit` |
+| rosbridge | `rb-enum`, `rb-inject`, `rb-audit` |
+| Phase 3 — ICS/OT | `ics-enum`, `modbus-scan`, `mqtt-scan`, `opcua-scan`, `aws-scan`, `shodan-dds` |
+| Phase 4 — C2 | `c2-server`, `c2-beacon`, `c2-exfil`, `c2-recv` |
+| Phase 5A — micro-ROS | `microros-agent`, `xrce-traffic`, `xrce-hijack`, `uros-implant`, `uros-persist`, `uros-c2` |
+| Phase 5B — SROS2 | `sros2-intercept`, `sros2-harvest`, `sros2-policy`, `sros2-infiltrate` |
+| Phase 5C — Nav2/Ctrl | `nav2-lifecycle`, `nav2-costmap`, `nav2-bt`, `ros2ctrl-exploit` |
+| Phase 6 — Edge AI | `ai-enum`, `ai-perturb`, `ai-extract`, `ai-poison` |
+
+---
+
+## CLI Usage
 
 ```
 python3 ros2reaper.py <command> [options]

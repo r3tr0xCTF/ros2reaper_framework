@@ -26,3 +26,6 @@ pymodbus>=3.5.0
 
 # aws-scan: AWS IoT Greengrass bridge analysis
 requests>=2.31.0
+
+# GUI (ros2reaper_gui.py)
+customtkinter>=5.2.0
