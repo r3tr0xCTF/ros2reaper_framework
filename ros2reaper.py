@@ -96,6 +96,12 @@ Commands (Phase 6: Edge AI / Perception Pipeline):
     ai-extract      - Black-box model extraction: fingerprint, timing side-channel, membership
     ai-poison       - Model poisoning: Triton swap, ONNX backdoor, ROS 2 param injection
 
+Commands (Phase 7: Physical Robot Targeting — Unitree):
+    unitree-recon   - Discover Unitree robots (Go2/G1/B2/H1/H2) by DDS topic fingerprint
+    unitree-api     - Exploit unauthenticated unitree_api (DAMP/MOVE/FLIP/custom by ID)
+    unitree-lowcmd  - Direct motor control via CRC32-correct LowCmd injection
+    unitree-sport   - Continuous sport mode hijacking (velocity lock, damp loop, state spoof)
+
 Author: Gh057x
 License: MIT — Use responsibly.
 """
@@ -1785,6 +1791,119 @@ def cmd_ros2ctrl_exploit(args):
 
 
 # =============================================================================
+# Phase 7: Unitree Physical Robot Targeting
+# =============================================================================
+
+def cmd_unitree_recon(args):
+    """Discover and fingerprint Unitree robots by DDS topic signatures"""
+    from modules.phase7.unitree_recon import (
+        run as unitree_recon_run,
+        print_recon_report,
+        export_json as p7_export,
+    )
+    mode = getattr(args, "unitree_recon_mode", "enumerate") or "enumerate"
+    result = unitree_recon_run(
+        mode=mode,
+        domain_id=args.domain_id,
+        timeout=args.timeout,
+        duration=args.duration,
+        verbose=args.verbose,
+    )
+    print_recon_report(result)
+    if args.output:
+        p7_export(result, args.output)
+
+
+def cmd_unitree_api(args):
+    """Exploit Unitree unauthenticated sport API (unitree_api/msg/Request)"""
+    from modules.phase7.unitree_api_exploit import (
+        run as unitree_api_run,
+        print_api_report,
+        export_json as p7_export,
+        UnitreeApiMode,
+    )
+    mode_str = getattr(args, "unitree_api_mode", "enumerate") or "enumerate"
+    try:
+        mode = UnitreeApiMode(mode_str)
+    except ValueError:
+        print(f"[-] Unknown unitree-api mode: {mode_str}")
+        return
+
+    result = unitree_api_run(
+        mode=mode,
+        domain_id=args.domain_id,
+        custom_api_id=getattr(args, "unitree_api_id", None),
+        vx=getattr(args, "sport_vx", 0.0),
+        vy=getattr(args, "sport_vy", 0.0),
+        vyaw=getattr(args, "sport_vyaw", 0.0),
+        duration=args.duration,
+        verbose=args.verbose,
+    )
+    print_api_report(result)
+    if args.output:
+        p7_export(result, args.output)
+
+
+def cmd_unitree_lowcmd(args):
+    """Inject CRC32-correct LowCmd for direct motor control"""
+    from modules.phase7.unitree_lowcmd_injector import (
+        run as lowcmd_run,
+        print_lowcmd_report,
+        export_json as p7_export,
+        LowCmdMode,
+    )
+    mode_str = getattr(args, "lowcmd_mode", "enumerate") or "enumerate"
+    try:
+        mode = LowCmdMode(mode_str)
+    except ValueError:
+        print(f"[-] Unknown unitree-lowcmd mode: {mode_str}")
+        return
+
+    result = lowcmd_run(
+        mode=mode,
+        domain_id=args.domain_id,
+        joint_taus=getattr(args, "joint_tau", None),
+        joint_qs=getattr(args, "joint_q", None),
+        duration=args.duration,
+        verbose=args.verbose,
+    )
+    print_lowcmd_report(result)
+    if args.output:
+        p7_export(result, args.output)
+
+
+def cmd_unitree_sport(args):
+    """Continuous sport mode hijacking (velocity lock, damp loop, state spoof)"""
+    from modules.phase7.unitree_sport_hijacker import (
+        run as sport_run,
+        print_sport_report,
+        export_json as p7_export,
+        SportHijackMode,
+    )
+    mode_str = getattr(args, "unitree_sport_mode", "enumerate") or "enumerate"
+    try:
+        mode = SportHijackMode(mode_str)
+    except ValueError:
+        print(f"[-] Unknown unitree-sport mode: {mode_str}")
+        return
+
+    result = sport_run(
+        mode=mode,
+        domain_id=args.domain_id,
+        vx=getattr(args, "sport_vx", 0.0),
+        vy=getattr(args, "sport_vy", 0.0),
+        vyaw=getattr(args, "sport_vyaw", 0.0),
+        gait_type=getattr(args, "sport_gait", 1),
+        duration=args.duration,
+        rate=getattr(args, "sport_rate", 10.0),
+        verbose=args.verbose,
+    )
+    print_sport_report(result)
+    if args.output:
+        p7_export(result, args.output)
+
+
+# =============================================================================
 # Output Formatters
 # =============================================================================
 
@@ -2127,7 +2246,10 @@ Examples:
                                  "nav2-bt", "ros2ctrl-exploit",
                                  # Phase 6: Edge AI / Perception Pipeline
                                  "ai-enum", "ai-perturb",
-                                 "ai-extract", "ai-poison"],
+                                 "ai-extract", "ai-poison",
+                                 # Phase 7: Physical Robot Targeting (Unitree)
+                                 "unitree-recon", "unitree-api",
+                                 "unitree-lowcmd", "unitree-sport"],
                         help="Command to execute")
 
     # Target options
@@ -2488,6 +2610,47 @@ Examples:
     parser.add_argument("--trigger-size", type=int, default=16, dest="trigger_size",
                         help="ai-poison: trigger patch size in pixels (default: 16)")
 
+    # Phase 7: Unitree Physical Robot Targeting
+    parser.add_argument("--robot-model",
+                        choices=["go2", "g1", "b2", "b2w", "h1", "h2", "a1", "go1"],
+                        default=None, dest="robot_model",
+                        help="unitree-recon/api/lowcmd: target robot model")
+    parser.add_argument("--unitree-recon-mode",
+                        choices=["enumerate", "sniff"],
+                        default="enumerate", dest="unitree_recon_mode",
+                        help="unitree-recon mode: enumerate (topic scan) or sniff (live state)")
+    parser.add_argument("--unitree-api-mode",
+                        choices=["enumerate", "damp", "stop_move", "stand_down", "stand_up",
+                                 "recovery_stand", "sit", "move", "speed_level", "dance",
+                                 "front_flip", "back_flip", "handstand", "custom"],
+                        default="enumerate", dest="unitree_api_mode",
+                        help="unitree-api attack mode (default: enumerate)")
+    parser.add_argument("--unitree-api-id", type=int, default=None, dest="unitree_api_id",
+                        help="unitree-api custom: numeric API ID to send")
+    parser.add_argument("--sport-vx", type=float, default=0.0, dest="sport_vx",
+                        help="Sport move velocity X in m/s (default: 0.0)")
+    parser.add_argument("--sport-vy", type=float, default=0.0, dest="sport_vy",
+                        help="Sport move velocity Y in m/s (default: 0.0)")
+    parser.add_argument("--sport-vyaw", type=float, default=0.0, dest="sport_vyaw",
+                        help="Sport move yaw speed in rad/s (default: 0.0)")
+    parser.add_argument("--sport-rate", type=float, default=10.0, dest="sport_rate",
+                        help="Publish rate Hz for continuous sport injection (default: 10.0)")
+    parser.add_argument("--sport-gait", type=int, default=1, dest="sport_gait",
+                        help="Gait type for gait_force (0=idle 1=trot 2=trot_run, default: 1)")
+    parser.add_argument("--lowcmd-mode",
+                        choices=["enumerate", "damp", "freeze", "torque_inject", "position_lock"],
+                        default="enumerate", dest="lowcmd_mode",
+                        help="unitree-lowcmd attack mode (default: enumerate)")
+    parser.add_argument("--joint-tau", nargs="+", default=None, dest="joint_tau",
+                        help="unitree-lowcmd torque_inject: torque values for 12 joints (N.m)")
+    parser.add_argument("--joint-q", nargs="+", default=None, dest="joint_q",
+                        help="unitree-lowcmd position_lock/freeze: target joint positions (rad)")
+    parser.add_argument("--unitree-sport-mode",
+                        choices=["enumerate", "velocity_lock", "emergency_freeze",
+                                 "damp_loop", "gait_force", "spoof_state"],
+                        default="enumerate", dest="unitree_sport_mode",
+                        help="unitree-sport hijack mode (default: enumerate)")
+
     # Output options
     parser.add_argument("-o", "--output", help="Output file path (JSON)")
     parser.add_argument("-v", "--verbose", action="store_true",
@@ -2564,6 +2727,11 @@ Examples:
         "ai-perturb": cmd_ai_perturb,
         "ai-extract": cmd_ai_extract,
         "ai-poison":  cmd_ai_poison,
+        # Phase 7: Physical Robot Targeting (Unitree)
+        "unitree-recon":  cmd_unitree_recon,
+        "unitree-api":    cmd_unitree_api,
+        "unitree-lowcmd": cmd_unitree_lowcmd,
+        "unitree-sport":  cmd_unitree_sport,
     }
 
     try:

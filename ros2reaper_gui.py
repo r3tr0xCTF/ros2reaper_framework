@@ -109,6 +109,12 @@ PHASES = [
         ("ai-extract", "Black-box model extraction"),
         ("ai-poison",  "Model poisoning"),
     ]),
+    ("PHASE 7 — Unitree", [
+        ("unitree-recon",  "Discover & fingerprint Unitree robots"),
+        ("unitree-api",    "Exploit unauthenticated Sport API"),
+        ("unitree-lowcmd", "Direct motor control (LowCmd inject)"),
+        ("unitree-sport",  "Continuous sport mode hijacking"),
+    ]),
 ]
 
 # Argument definitions: (flag, label, type, default, choices/help)
@@ -272,6 +278,29 @@ ARG_DEFS = {
     "hw_name":         ("--hw-name",         "HW component",     "str",   "", None),
     "traj_duration":   ("--traj-duration",   "Traj duration (s)","float", "2.0", None),
 
+    # Phase 7 — Unitree
+    "robot_model":      ("--robot-model",       "Robot model",     "choice", "",
+                         ["go2", "g1", "b2", "b2w", "h1", "h2", "a1", "go1"]),
+    "unitree_recon_mode": ("--unitree-recon-mode", "Recon mode",   "choice", "enumerate",
+                           ["enumerate", "sniff"]),
+    "unitree_api_mode": ("--unitree-api-mode",  "API attack mode", "choice", "enumerate",
+                         ["enumerate", "damp", "stop_move", "stand_down", "stand_up",
+                          "recovery_stand", "sit", "move", "speed_level", "dance",
+                          "front_flip", "back_flip", "handstand", "custom"]),
+    "unitree_api_id":   ("--unitree-api-id",    "Custom API ID",   "int",    "", None),
+    "sport_vx":         ("--sport-vx",          "Velocity X (m/s)","float",  "0.0", None),
+    "sport_vy":         ("--sport-vy",          "Velocity Y (m/s)","float",  "0.0", None),
+    "sport_vyaw":       ("--sport-vyaw",        "Yaw speed (rad/s)","float", "0.0", None),
+    "sport_rate":       ("--sport-rate",        "Pub rate (Hz)",   "float",  "10.0", None),
+    "sport_gait":       ("--sport-gait",        "Gait type (0-3)", "int",    "1", None),
+    "lowcmd_mode":      ("--lowcmd-mode",       "LowCmd mode",     "choice", "enumerate",
+                         ["enumerate", "damp", "freeze", "torque_inject", "position_lock"]),
+    "joint_tau":        ("--joint-tau",         "Joint torques",   "strList","", None),
+    "joint_q":          ("--joint-q",           "Joint positions", "strList","", None),
+    "unitree_sport_mode":("--unitree-sport-mode","Hijack mode",    "choice", "enumerate",
+                          ["enumerate", "velocity_lock", "emergency_freeze",
+                           "damp_loop", "gait_force", "spoof_state"]),
+
     # Phase 6
     "ai_enum_mode":     ("--ai-enum-mode",     "Enum scope",      "choice", "",
                          ["all", "triton", "tf_serving", "onnx_rt",
@@ -393,6 +422,15 @@ CMD_ARGS = {
     "ros2ctrl-exploit": ["ctrl_mode", "controller_name", "joint_names",
                          "joint_positions", "stop_controllers", "start_controllers",
                          "hw_name", "traj_duration", "namespace", "verbose"],
+
+    "unitree-recon":  ["domain_id", "unitree_recon_mode", "timeout", "duration", "output", "verbose"],
+    "unitree-api":    ["domain_id", "unitree_api_mode", "unitree_api_id",
+                       "sport_vx", "sport_vy", "sport_vyaw", "duration", "output", "verbose"],
+    "unitree-lowcmd": ["domain_id", "lowcmd_mode", "joint_tau", "joint_q",
+                       "duration", "sport_rate", "output", "verbose"],
+    "unitree-sport":  ["domain_id", "unitree_sport_mode",
+                       "sport_vx", "sport_vy", "sport_vyaw",
+                       "sport_gait", "sport_rate", "duration", "output", "verbose"],
 
     "ai-enum":    ["target", "ai_enum_mode", "ai_ports", "ai_fs_paths", "verbose"],
     "ai-perturb": ["target", "perturb_mode", "adv_epsilon", "adv_input", "adv_output",
