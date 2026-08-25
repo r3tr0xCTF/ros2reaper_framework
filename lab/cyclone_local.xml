@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CycloneDDS config for single-host lab (VM / loopback).
+  Forces all DDS traffic onto the loopback interface and uses
+  unicast peer discovery, avoiding multicast issues in VMs and WSL2.
+
+  Usage:
+    export CYCLONEDDS_URI=file:///path/to/lab/cyclone_local.xml
+    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+  For multi-host LAN testing use cyclone_network.xml instead.
+-->
+<CycloneDDS>
+  <Domain>
+    <General>
+      <!-- Restrict to loopback for single-host lab -->
+      <NetworkInterfaceAddress>lo</NetworkInterfaceAddress>
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>32</MaxAutoParticipantIndex>
+      <Peers>
+        <Peer address="127.0.0.1"/>
+      </Peers>
+    </Discovery>
+    <Tracing>
+      <Verbosity>warning</Verbosity>
+      <OutputFile>stderr</OutputFile>
+    </Tracing>
+  </Domain>
+</CycloneDDS>

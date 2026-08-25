@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CycloneDDS config for LAN testing (VM with bridged adapter, or bare-metal).
+  Auto-detects the active non-loopback interface and enables multicast discovery.
+  Set CYCLONEDDS_IFACE to override the interface name (e.g. eth0, ens3, wlan0).
+
+  Usage:
+    export CYCLONEDDS_URI=file:///path/to/lab/cyclone_network.xml
+    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+-->
+<CycloneDDS>
+  <Domain>
+    <General>
+      <!-- Leave empty to auto-select; or hardcode: <NetworkInterfaceAddress>eth0</NetworkInterfaceAddress> -->
+      <NetworkInterfaceAddress>auto</NetworkInterfaceAddress>
+      <AllowMulticast>true</AllowMulticast>
+      <MulticastTimeToLive>1</MulticastTimeToLive>
+    </General>
+    <Discovery>
+      <ParticipantIndex>auto</ParticipantIndex>
+      <MaxAutoParticipantIndex>64</MaxAutoParticipantIndex>
+    </Discovery>
+    <Tracing>
+      <Verbosity>warning</Verbosity>
+      <OutputFile>stderr</OutputFile>
+    </Tracing>
+  </Domain>
+</CycloneDDS>
