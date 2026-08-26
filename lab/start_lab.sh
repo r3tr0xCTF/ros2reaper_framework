@@ -94,76 +94,57 @@ case "$MODE" in
         ;;
 
     gazebo)
-        # ── Full physics Gazebo Harmonic sim ──────────────────────────────────
-        echo "[*] Starting Gazebo Harmonic simulation lab..."
+        # ── rviz2 visualization lab (replaces Gazebo — Ogre2 broken on this system) ──
+        echo "[*] Starting rviz2 visualization lab..."
         _source_env
-        # gz binary lives under the ROS2 vendor path — check after sourcing
-        command -v gz >/dev/null 2>&1 || {
-            echo "[X] Gazebo not found after sourcing ROS2."
-            echo "    Run: ! bash lab/install_gazebo.sh"
-            exit 1
-        }
-
-        # Source ros_gz packages (installed alongside ROS2 Jazzy)
-        set +u
-        for gz_setup in /opt/ros/jazzy/share/ros_gz_sim/cmake/../../../setup.bash \
-                        /opt/ros/jazzy/setup.bash; do
-            [ -f "$gz_setup" ] && source "$gz_setup" && break
-        done
-        set -u
 
         echo "[*] Stopping any previous lab processes..."
-        pkill -f "gz sim" 2>/dev/null; pkill -f "unitree_gz_translator" 2>/dev/null
-        pkill -f "ros_gz_bridge" 2>/dev/null; sleep 1
+        pkill -f "unitree_gz_translator" 2>/dev/null
+        pkill -f "robot_state_publisher" 2>/dev/null; sleep 1
 
         echo "[*] Flushing ROS2 daemon..."
         ros2 daemon stop 2>/dev/null; sleep 1; ros2 daemon start 2>/dev/null; sleep 1
 
-        # Export model path so Gazebo finds model://go2
-        export GZ_SIM_RESOURCE_PATH="$SCRIPT_DIR/gz/models${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}"
+        URDF="$SCRIPT_DIR/go2.urdf"
+        RVIZ_CFG="$SCRIPT_DIR/go2.rviz"
+        URDF_CONTENT="$(cat "$URDF")"
 
-        # Gazebo's Ogre2 renderer requires Qt's full interactive Wayland session
-        # for EGL context sharing.  This only works from a real desktop terminal,
-        # not from a subprocess.  So we start only the ROS2 support processes here
-        # and print the gz sim command for the user to run themselves.
+        echo "[*] Starting robot_state_publisher..."
+        ros2 run robot_state_publisher robot_state_publisher \
+            --ros-args -p robot_description:="$URDF_CONTENT" &
+        RSP_PID=$!
+        sleep 1
 
-        echo "[*] Starting ros_gz_bridge..."
-        ros2 run ros_gz_bridge parameter_bridge \
-            --ros-args -p config_file:="$SCRIPT_DIR/gz/bridge.yaml" &
-        BRIDGE_PID=$!
-        sleep 2
-
-        echo "[*] Starting Unitree↔Gazebo translator (homing controller + attack listener)..."
+        echo "[*] Starting Unitree translator (homing controller + attack listener + JointState)..."
         python3 "$SCRIPT_DIR/unitree_gz_translator.py" &
         TRANS_PID=$!
 
         echo ""
-        printf "\033[92m[+] ROS2 bridge and translator are running\033[0m\n"
-        echo "    PIDs: bridge=$BRIDGE_PID  translator=$TRANS_PID"
+        printf "\033[92m[+] robot_state_publisher and translator running\033[0m\n"
+        echo "    PIDs: rsp=$RSP_PID  translator=$TRANS_PID"
         echo ""
         printf "\033[93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n"
-        printf "\033[93m  OPEN A DESKTOP TERMINAL (not this one) and run:\033[0m\n"
+        printf "\033[93m  OPEN A DESKTOP TERMINAL and run rviz2:\033[0m\n"
         printf "\033[93m\033[0m\n"
         printf "\033[93m    source /opt/ros/jazzy/setup.bash\033[0m\n"
-        printf "\033[93m    export GZ_SIM_RESOURCE_PATH=$SCRIPT_DIR/gz/models\033[0m\n"
-        printf "\033[93m    DISPLAY=\"\" QT_QPA_PLATFORM=wayland \\\\\033[0m\n"
-        printf "\033[93m      gz sim $SCRIPT_DIR/gz/worlds/go2_world.sdf -v 2\033[0m\n"
+        printf "\033[93m    rviz2 -d $RVIZ_CFG\033[0m\n"
+        printf "\033[93m\033[0m\n"
+        printf "\033[93m  The Go2 robot model appears and homes to standing in ~3s.\033[0m\n"
+        printf "\033[93m  Attacks visually move the joints in real time.\033[0m\n"
         printf "\033[93m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n"
-        echo ""
-        echo "    The Go2 robot will appear and home to standing (~3s after launch)."
         echo ""
         echo "    Attack from another terminal (source lab_env.sh first):"
         echo "      python3 $REPO_DIR/ros2reaper.py unitree-api --unitree-api-mode damp --skip-auth --no-banner"
         echo "      python3 $REPO_DIR/ros2reaper.py unitree-sport --unitree-sport-mode velocity_lock --sport-vx 0.5 --duration 10 --skip-auth --no-banner"
         echo "      python3 $REPO_DIR/ros2reaper.py unitree-lowcmd --lowcmd-mode damp --robot-model go2 --skip-auth --no-banner"
         echo ""
-        echo "    Ctrl+C to stop bridge and translator."
+        echo "    Ctrl+C to stop."
         echo ""
 
-        trap "echo '[*] Stopping...'; kill $BRIDGE_PID $TRANS_PID 2>/dev/null" INT TERM
-        wait $BRIDGE_PID
+        trap "echo '[*] Stopping...'; kill $RSP_PID $TRANS_PID 2>/dev/null" INT TERM
+        wait $RSP_PID
         kill $TRANS_PID 2>/dev/null
-        echo "[+] Gazebo support processes stopped."
+        echo "[+] Visualization processes stopped."
         ;;
 
     *)
@@ -175,6 +156,6 @@ case "$MODE" in
         echo "  target   — start the mock Unitree robot (the DDS-only attack target)"
         echo "  attacker — source env and open attacker shell"
         echo "  tmux     — open both panes automatically in tmux"
-        echo "  gazebo   — full Gazebo Harmonic physics sim (robot visually responds to attacks)"
+        echo "  gazebo   — rviz2 visualization (robot model responds to attacks in real time)"
         ;;
 esac

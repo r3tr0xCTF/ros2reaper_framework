@@ -26,6 +26,7 @@ from rclpy.executors import ExternalShutdownException
 import json, math, time, threading
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Twist
+from sensor_msgs.msg import JointState
 
 try:
     from unitree_api.msg import Request
@@ -68,6 +69,14 @@ API_MOVE       = 1008
 
 HOMING_RATE = 50  # Hz — how often joint velocity commands are published
 
+# Joint names in URDF / JointState (must match go2.urdf)
+JOINT_STATE_NAMES = [
+    "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",
+    "FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
+    "RR_hip_joint", "RR_thigh_joint", "RR_calf_joint",
+    "RL_hip_joint", "RL_thigh_joint", "RL_calf_joint",
+]
+
 
 class UnitreeGzTranslator(Node):
 
@@ -92,6 +101,9 @@ class UnitreeGzTranslator(Node):
             for name in JOINT_NAMES
         }
         self._cmd_vel_pub = self.create_publisher(Twist, "/go2/cmd_vel", 5)
+
+        # ── Publisher: JointState → robot_state_publisher → rviz2 ────────────
+        self._joint_state_pub = self.create_publisher(JointState, "/joint_states", 10)
 
         # ── Publishers: fake Unitree telemetry (ROS2 only) ───────────────────
         if _UNITREE:
@@ -224,11 +236,19 @@ class UnitreeGzTranslator(Node):
         with self._lock:
             self._vpos = new_vpos
 
-        # Publish joint velocity commands
+        # Publish joint velocity commands (Gazebo bridge)
         for i, name in enumerate(JOINT_NAMES):
             msg = Float64()
             msg.data = float(vels[i])
             self._jv_pubs[name].publish(msg)
+
+        # Publish JointState (rviz2 / robot_state_publisher)
+        js = JointState()
+        js.header.stamp = self.get_clock().now().to_msg()
+        js.name     = JOINT_STATE_NAMES
+        js.position = [float(new_vpos[i]) for i in range(12)]
+        js.velocity = [float(vels[i]) for i in range(12)]
+        self._joint_state_pub.publish(js)
 
         # Publish body velocity
         if bv_act:
