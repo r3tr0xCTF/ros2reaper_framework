@@ -22,6 +22,7 @@ Attack → Gazebo mapping:
 
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import ExternalShutdownException
 import json, math, time, threading
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Twist
@@ -302,7 +303,7 @@ def main():
     node = UnitreeGzTranslator()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()

@@ -112,6 +112,10 @@ case "$MODE" in
         done
         set -u
 
+        echo "[*] Stopping any previous lab processes..."
+        pkill -f "gz sim" 2>/dev/null; pkill -f "unitree_gz_translator" 2>/dev/null
+        pkill -f "ros_gz_bridge" 2>/dev/null; sleep 1
+
         echo "[*] Flushing ROS2 daemon..."
         ros2 daemon stop 2>/dev/null; sleep 1; ros2 daemon start 2>/dev/null; sleep 1
 
