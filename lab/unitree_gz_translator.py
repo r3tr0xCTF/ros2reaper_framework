@@ -288,7 +288,9 @@ class UnitreeGzTranslator(Node):
 
         # BmsState
         bms = BmsState()
-        bms.version_h = 1
+        bms.version_high = 1
+        bms.version_low = 0
+        bms.soc = 87
         bms.bq_ntc = [30, 30]
         bms.mcu_ntc = [35, 35]
         bms.cell_vol = [3850] * 15
