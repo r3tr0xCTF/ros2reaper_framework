@@ -66,6 +66,24 @@ API_STOP_MOVE  = 1003
 API_STAND_DOWN = 1005
 API_STAND_UP   = 1004
 API_MOVE       = 1008
+API_FRONT_FLIP = 1030
+API_BACK_FLIP  = 2043
+
+# Flip animation keyframes: (joint_targets, kp, hold_seconds)
+_FLIP_PHASES_FRONT = [
+    ([0.0, 0.4, -2.6,  0.0, 0.4, -2.6,  0.0, 0.4, -2.6,  0.0, 0.4, -2.6],  8.0, 0.25),  # crouch
+    ([0.0,-0.6,-1.0,   0.0,-0.6,-1.0,   0.0,-0.6,-1.0,   0.0,-0.6,-1.0],    10.0, 0.20),  # launch
+    ([0.0, 3.0,-2.5,   0.0, 3.0,-2.5,   0.0, 3.0,-2.5,   0.0, 3.0,-2.5],    10.0, 0.35),  # tuck/flip
+    ([0.0, 0.6,-1.5,   0.0, 0.6,-1.5,   0.0, 0.6,-1.5,   0.0, 0.6,-1.5],    8.0,  0.25),  # extend
+    (STAND_POS,                                                                 5.0,  0.80),  # land
+]
+_FLIP_PHASES_BACK = [
+    ([0.0, 0.4, -2.6,  0.0, 0.4, -2.6,  0.0, 0.4, -2.6,  0.0, 0.4, -2.6],  8.0, 0.25),  # crouch
+    ([0.0, 1.8,-0.8,   0.0, 1.8,-0.8,   0.0, 1.8,-0.8,   0.0, 1.8,-0.8],    10.0, 0.20),  # launch back
+    ([0.0,-0.5,-2.5,   0.0,-0.5,-2.5,   0.0,-0.5,-2.5,   0.0,-0.5,-2.5],    10.0, 0.35),  # tuck/flip
+    ([0.0, 0.6,-1.5,   0.0, 0.6,-1.5,   0.0, 0.6,-1.5,   0.0, 0.6,-1.5],    8.0,  0.25),  # extend
+    (STAND_POS,                                                                 5.0,  0.80),  # land
+]
 
 HOMING_RATE = 50  # Hz — how often joint velocity commands are published
 
@@ -181,6 +199,28 @@ class UnitreeGzTranslator(Node):
                 )
                 self._body_vel = (vx, vy, vyaw)
                 self._body_vel_active = True
+            elif api_id == API_FRONT_FLIP:
+                self.get_logger().warn(
+                    "\033[95m[ATTACK] FRONT_FLIP (1030) — executing flip sequence!\033[0m"
+                )
+                self._mode = "flip"
+                threading.Thread(
+                    target=self._flip_sequence,
+                    args=(_FLIP_PHASES_FRONT, "front flip"),
+                    daemon=True
+                ).start()
+
+            elif api_id == API_BACK_FLIP:
+                self.get_logger().warn(
+                    "\033[95m[ATTACK] BACK_FLIP (2043) — executing flip sequence!\033[0m"
+                )
+                self._mode = "flip"
+                threading.Thread(
+                    target=self._flip_sequence,
+                    args=(_FLIP_PHASES_BACK, "back flip"),
+                    daemon=True
+                ).start()
+
             else:
                 self.get_logger().info(f"[ATTACK] sport api_id={api_id} received")
 
@@ -201,6 +241,16 @@ class UnitreeGzTranslator(Node):
                     self._target_pos[i] = q
                 elif abs(tau) > 0.1:
                     self._target_pos[i] = self._vpos[i] + (tau * 0.3)
+
+    def _flip_sequence(self, phases, label):
+        for target, kp, duration in phases:
+            with self._lock:
+                self._target_pos = list(target)
+                self._kp = kp
+            time.sleep(duration)
+        with self._lock:
+            self._mode = "standing"
+        self.get_logger().info(f"\033[92m[gz-translator] {label} complete — standing\033[0m")
 
     # ── Homing / control tick ─────────────────────────────────────────────────
 

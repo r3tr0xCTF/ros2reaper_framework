@@ -7,10 +7,6 @@ Panels:
         - /Global Options1
         - /RobotModel1
       Splitter Ratio: 0.5
-  - Class: rviz_common/Selection
-    Name: Selection
-  - Class: rviz_common/Tool Properties
-    Name: Tool Properties
   - Class: rviz_common/Views
     Expanded: true
     Name: Views
@@ -23,15 +19,12 @@ VisualizationManager:
       Class: rviz_default_plugins/Grid
       Color: 160; 160; 164
       Enabled: true
-      Line Style:
-        Line Width: 0.03
-        Value: Lines
       Name: Grid
       Normal Cell Count: 0
       Offset:
         X: 0
         Y: 0
-        Z: -0.55
+        Z: -0.5
       Plane: XY
       Plane Cell Count: 20
       Reference Frame: <Fixed Frame>
@@ -46,31 +39,10 @@ VisualizationManager:
         Reliability Policy: Reliable
         Value: /robot_description
       Enabled: true
-      Links:
-        All Links Enabled: true
-        Expand Joint Details: false
-        Expand Link Details: false
-        Expand Tree: false
-        Link Tree Style: Links in Alphabetic Order
       Name: RobotModel
       TF Prefix: ""
-      Update Interval: 0
       Value: true
       Visual Enabled: true
-    - Class: rviz_default_plugins/TF
-      Enabled: false
-      Frame Timeout: 15
-      Frames:
-        All Enabled: false
-      Marker Scale: 0.5
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: false
-      Tree:
-        {}
-      Update Interval: 0
-      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -91,38 +63,12 @@ VisualizationManager:
     Current:
       Class: rviz_default_plugins/Orbit
       Distance: 2.2
-      Enable Stereo Rendering:
-        Stereo Eye Separation: 0.06
-        Stereo Focal Distance: 1
-        Swap Stereo Eyes: false
-        Value: false
       Focal Point:
         X: 0
         Y: 0
-        Z: 0.1
-      Focal Shape Fixed Size: true
-      Focal Shape Size: 0.05
-      Invert Z Axis: false
+        Z: 0
       Name: Current View
-      Near Clip Distance: 0.01
       Pitch: 0.35
-      Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
       Yaw: 5.5
     Saved: ~
-Window Geometry:
-  Displays:
-    collapsed: false
-  Height: 800
-  Hide Left Dock: false
-  Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd0000000400000000000001560000030afc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000002000730065006c0065006300740069006f006e00000001e10000009b0000000000000000fb00000004000000000000000300000001e10000015600000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
-  Selection:
-    collapsed: false
-  Tool Properties:
-    collapsed: false
-  Views:
-    collapsed: false
-  Width: 1280
-  X: 50
-  Y: 50

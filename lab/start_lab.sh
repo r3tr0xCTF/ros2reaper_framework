@@ -47,7 +47,8 @@ case "$MODE" in
         echo "[*] Starting mock Unitree robot (target)..."
         _source_env
         echo "[*] Flushing ROS2 daemon (ensures clean graph discovery)..."
-        ros2 daemon stop 2>/dev/null; sleep 1; ros2 daemon start 2>/dev/null; sleep 1
+        ros2 daemon stop 2>/dev/null || true; sleep 1
+        ros2 daemon start 2>/dev/null || true; sleep 1
         exec python3 "$SCRIPT_DIR/mock_unitree.py" "$@"
         ;;
 
@@ -99,11 +100,13 @@ case "$MODE" in
         _source_env
 
         echo "[*] Stopping any previous lab processes..."
-        pkill -f "unitree_gz_translator" 2>/dev/null
-        pkill -f "robot_state_publisher" 2>/dev/null; sleep 1
+        pkill -f "unitree_gz_translator" 2>/dev/null || true
+        pkill -f "robot_state_publisher" 2>/dev/null || true
+        sleep 1
 
         echo "[*] Flushing ROS2 daemon..."
-        ros2 daemon stop 2>/dev/null; sleep 1; ros2 daemon start 2>/dev/null; sleep 1
+        ros2 daemon stop 2>/dev/null || true; sleep 1
+        ros2 daemon start 2>/dev/null || true; sleep 1
 
         URDF="$SCRIPT_DIR/go2.urdf"
         RVIZ_CFG="$SCRIPT_DIR/go2.rviz"
@@ -127,7 +130,7 @@ case "$MODE" in
         printf "\033[93m  OPEN A DESKTOP TERMINAL and run rviz2:\033[0m\n"
         printf "\033[93m\033[0m\n"
         printf "\033[93m    source /opt/ros/jazzy/setup.bash\033[0m\n"
-        printf "\033[93m    rviz2 -d $RVIZ_CFG\033[0m\n"
+        printf "\033[93m    DISPLAY=:1 QT_QPA_PLATFORM=xcb rviz2 -d $RVIZ_CFG\033[0m\n"
         printf "\033[93m\033[0m\n"
         printf "\033[93m  The Go2 robot model appears and homes to standing in ~3s.\033[0m\n"
         printf "\033[93m  Attacks visually move the joints in real time.\033[0m\n"
