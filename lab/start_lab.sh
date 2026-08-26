@@ -46,6 +46,8 @@ case "$MODE" in
     target)
         echo "[*] Starting mock Unitree robot (target)..."
         _source_env
+        echo "[*] Flushing ROS2 daemon (ensures clean graph discovery)..."
+        ros2 daemon stop 2>/dev/null; sleep 1; ros2 daemon start 2>/dev/null; sleep 1
         exec python3 "$SCRIPT_DIR/mock_unitree.py" "$@"
         ;;
 

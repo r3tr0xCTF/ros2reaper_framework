@@ -37,6 +37,7 @@ OPSEC note:
 
 import subprocess
 import json
+import os
 import time
 import threading
 import signal
@@ -99,15 +100,19 @@ def _sportstate_yaml(vx: float = 0.0, vy: float = 0.0, vyaw: float = 0.0,
     )
 
 
+def _env(domain_id: int) -> dict:
+    e = os.environ.copy()
+    e["ROS_DOMAIN_ID"] = str(domain_id)
+    return e
+
+
 def _pub_continuous(topic: str, msg_type: str, yaml_msg: str,
                     domain_id: int, rate: float, duration: float) -> tuple:
-    cmd = [
-        "ros2", "topic", "pub", f"--rate={rate:.0f}", "--no-daemon",
-        "--ros-args", f"__domain_id:={domain_id}",
-        "--", topic, msg_type, yaml_msg,
-    ]
+    cmd = ["ros2", "topic", "pub", f"--rate={rate:.0f}",
+           "--wait-matching-subscriptions", "1", topic, msg_type, yaml_msg]
     try:
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                env=_env(domain_id))
         time.sleep(duration)
         proc.terminate()
         proc.wait(timeout=3.0)
@@ -122,10 +127,9 @@ def _pub_continuous(topic: str, msg_type: str, yaml_msg: str,
 def _pub_once(topic: str, msg_type: str, yaml_msg: str, domain_id: int) -> tuple:
     try:
         r = subprocess.run(
-            ["ros2", "topic", "pub", "--once", "--no-daemon",
-             "--ros-args", f"__domain_id:={domain_id}",
-             "--", topic, msg_type, yaml_msg],
-            capture_output=True, text=True, timeout=8.0
+            ["ros2", "topic", "pub", "--once",
+             "--wait-matching-subscriptions", "1", topic, msg_type, yaml_msg],
+            capture_output=True, text=True, timeout=8.0, env=_env(domain_id)
         )
         return r.returncode == 0, r.stdout + r.stderr
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
@@ -280,9 +284,9 @@ def enumerate_attack_surface(domain_id: int) -> dict:
     for t in topics_of_interest:
         try:
             r = subprocess.run(
-                ["ros2", "topic", "info", t, "--no-daemon",
-                 "--ros-args", f"__domain_id:={domain_id}"],
-                capture_output=True, text=True, timeout=4.0
+                ["ros2", "topic", "info", t],
+                capture_output=True, text=True, timeout=4.0,
+                env=_env(domain_id)
             )
             presence[t] = "active" if r.returncode == 0 else "not found"
         except (FileNotFoundError, OSError):

@@ -1,32 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  CycloneDDS config for single-host lab (VM / loopback).
-  Forces all DDS traffic onto the loopback interface and uses
-  unicast peer discovery, avoiding multicast issues in VMs and WSL2.
-
-  Usage:
-    export CYCLONEDDS_URI=file:///path/to/lab/cyclone_local.xml
-    export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-
-  For multi-host LAN testing use cyclone_network.xml instead.
+  CycloneDDS 0.10.x config for single-host lab.
+  Both mock robot and attacker run on the same machine, so CycloneDDS
+  uses shared-memory transport for intra-host discovery automatically.
+  Multicast disabled to avoid VM network issues.
 -->
-<CycloneDDS>
-  <Domain>
+<CycloneDDS xmlns="https://cdds.io/config" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+  <Domain id="any">
     <General>
-      <!-- Restrict to loopback for single-host lab -->
-      <NetworkInterfaceAddress>lo</NetworkInterfaceAddress>
       <AllowMulticast>false</AllowMulticast>
+      <MaxMessageSize>65500B</MaxMessageSize>
     </General>
     <Discovery>
-      <ParticipantIndex>auto</ParticipantIndex>
-      <MaxAutoParticipantIndex>32</MaxAutoParticipantIndex>
       <Peers>
-        <Peer address="127.0.0.1"/>
+        <Peer address="localhost"/>
       </Peers>
+      <ParticipantIndex>auto</ParticipantIndex>
     </Discovery>
     <Tracing>
       <Verbosity>warning</Verbosity>
-      <OutputFile>stderr</OutputFile>
     </Tracing>
   </Domain>
 </CycloneDDS>

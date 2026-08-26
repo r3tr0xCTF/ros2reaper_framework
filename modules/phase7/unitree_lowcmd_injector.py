@@ -58,6 +58,7 @@ LowCmd C struct layout (812 bytes total, GCC default alignment):
 import struct
 import subprocess
 import json
+import os
 import time
 from enum import Enum
 from typing import Optional
@@ -233,7 +234,7 @@ def _lowcmd_to_ros2_yaml(motors: list, level_flag: int = 0xFF) -> str:
         f"version: [0, 0]\n"
         f"bandwidth: 0\n"
         f"motor_cmd:\n" + "\n".join(motor_strs) + "\n"
-        f"bms_cmd: {{off: 0, reserve: [0, 0, 0]}}\n"
+        f'bms_cmd: {{"off": 0, reserve: [0, 0, 0]}}\n'
         f"wireless_remote: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n"
         f"                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,\n"
         f"                   0, 0, 0, 0, 0, 0, 0, 0]\n"
@@ -275,17 +276,20 @@ def inject_lowcmd(motors: list, domain_id: int, mode_name: str,
             "motors": motors[:12],
         }
 
-    cmd = [
-        "ros2", "topic", "pub", f"--rate={rate:.0f}", "--no-daemon",
-        "--ros-args", f"__domain_id:={domain_id}",
-        "--", LOWCMD_TOPIC, "unitree_go/msg/LowCmd", yaml_msg,
-    ]
+    env = {**os.environ, "ROS_DOMAIN_ID": str(domain_id)}
+    cmd = ["ros2", "topic", "pub", f"--rate={rate:.0f}",
+           "--wait-matching-subscriptions", "1",
+           LOWCMD_TOPIC, "unitree_go/msg/LowCmd", yaml_msg]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=duration + 6.0)
-        ok    = r.returncode == 0 or "publishing" in r.stdout.lower()
-        output = r.stdout + r.stderr
-    except subprocess.TimeoutExpired:
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                env=env)
+        time.sleep(duration)
+        proc.terminate()
+        proc.wait(timeout=3.0)
         ok, output = True, f"Published {mode_name} for {duration}s at {rate:.0f}Hz"
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        ok, output = True, f"Published {mode_name} for {duration}s"
     except (FileNotFoundError, OSError) as e:
         ok, output = False, str(e)
 
@@ -303,12 +307,12 @@ def check_lowcmd_exposure(domain_id: int) -> dict:
     """Check if LowCmd topic is exposed and writable."""
     findings = {}
 
+    env = {**os.environ, "ROS_DOMAIN_ID": str(domain_id)}
     # Check topic presence
     try:
         r = subprocess.run(
-            ["ros2", "topic", "info", LOWCMD_TOPIC, "--no-daemon",
-             "--ros-args", f"__domain_id:={domain_id}"],
-            capture_output=True, text=True, timeout=5.0
+            ["ros2", "topic", "info", LOWCMD_TOPIC],
+            capture_output=True, text=True, timeout=5.0, env=env
         )
         findings["lowcmd_topic_active"] = r.returncode == 0 and "Subscription" in r.stdout
     except (FileNotFoundError, OSError):
@@ -318,9 +322,8 @@ def check_lowcmd_exposure(domain_id: int) -> dict:
     # Check lowstate for motor count
     try:
         r = subprocess.run(
-            ["ros2", "topic", "echo", "--once", "--no-daemon",
-             "--ros-args", f"__domain_id:={domain_id}", "--", LOWSTATE_TOPIC],
-            capture_output=True, text=True, timeout=6.0
+            ["ros2", "topic", "echo", "--once", LOWSTATE_TOPIC],
+            capture_output=True, text=True, timeout=6.0, env=env
         )
         if r.returncode == 0 and r.stdout:
             import re

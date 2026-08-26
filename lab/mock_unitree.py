@@ -240,8 +240,8 @@ class MockUnitreeRobot(Node):
         msg.current      = -500       # mA
         msg.cycle        = 12
         msg.bq_ntc       = [30, 30]
-        msg.mos_ntc      = [35, 35]
-        msg.cell_vol     = [3850] * 14
+        msg.mcu_ntc      = [35, 35]
+        msg.cell_vol     = [3850] * 15
         self._pub_bms.publish(msg)
 
     # ── Attack handlers ───────────────────────────────────────────────────────
@@ -315,12 +315,13 @@ def main():
         executor.spin()
     except KeyboardInterrupt:
         pass
-    finally:
-        print(f"\n{CYAN}[*]{NC} Mock robot shutting down.")
-        print(f"    Total Sport API hits : {ATTACK_COUNT['sport']}")
-        print(f"    Total LowCmd hits    : {ATTACK_COUNT['lowcmd']}")
-        robot.destroy_node()
-        rclpy.shutdown()
+
+    print(f"\n{CYAN}[*]{NC} Mock robot shutting down.")
+    print(f"    Total Sport API hits : {ATTACK_COUNT['sport']}")
+    print(f"    Total LowCmd hits    : {ATTACK_COUNT['lowcmd']}")
+    executor.shutdown(timeout_sec=1.0)
+    robot.destroy_node()
+    rclpy.try_shutdown()
 
 
 if __name__ == "__main__":

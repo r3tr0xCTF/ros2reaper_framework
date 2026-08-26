@@ -2616,9 +2616,9 @@ Examples:
                         default=None, dest="robot_model",
                         help="unitree-recon/api/lowcmd: target robot model")
     parser.add_argument("--unitree-recon-mode",
-                        choices=["enumerate", "sniff"],
+                        choices=["enumerate", "sniff", "vulnerabilities", "full"],
                         default="enumerate", dest="unitree_recon_mode",
-                        help="unitree-recon mode: enumerate (topic scan) or sniff (live state)")
+                        help="unitree-recon mode: enumerate, sniff, vulnerabilities, full")
     parser.add_argument("--unitree-api-mode",
                         choices=["enumerate", "damp", "stop_move", "stand_down", "stand_up",
                                  "recovery_stand", "sit", "move", "speed_level", "dance",

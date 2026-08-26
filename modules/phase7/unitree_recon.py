@@ -32,6 +32,7 @@ Security issues:
 
 import subprocess
 import json
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Optional
@@ -93,33 +94,38 @@ class UnitreeRobot:
     vulns: list = field(default_factory=list)
 
 
-def _run_ros2(args: list, timeout: float = 5.0) -> Optional[str]:
+def _env(domain_id: int) -> dict:
+    e = os.environ.copy()
+    e["ROS_DOMAIN_ID"] = str(domain_id)
+    return e
+
+
+def _run_ros2(args: list, timeout: float = 5.0, domain_id: int = 0) -> Optional[str]:
     try:
-        r = subprocess.run(["ros2"] + args, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(["ros2"] + args, capture_output=True, text=True,
+                           timeout=timeout, env=_env(domain_id))
         return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else None
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         return None
 
 
 def _list_topics(domain_id: int, timeout: float) -> list:
-    env_args = ["--ros-args", f"__domain_id:={domain_id}"]
-    out = _run_ros2(["topic", "list", "--no-daemon"] + env_args, timeout=timeout)
+    out = _run_ros2(["topic", "list"], timeout=timeout, domain_id=domain_id)
     if not out:
         return []
     return [l.strip() for l in out.splitlines() if l.strip()]
 
 
 def _get_topic_type(topic: str, domain_id: int) -> Optional[str]:
-    return _run_ros2(["topic", "type", topic, "--no-daemon",
-                       "--ros-args", f"__domain_id:={domain_id}"], timeout=4.0)
+    return _run_ros2(["topic", "type", topic], timeout=4.0, domain_id=domain_id)
 
 
 def _echo_once(topic: str, domain_id: int, wait: float = 4.0) -> Optional[str]:
     try:
         r = subprocess.run(
-            ["ros2", "topic", "echo", "--once", "--no-daemon",
-             "--ros-args", f"__domain_id:={domain_id}", "--", topic],
-            capture_output=True, text=True, timeout=wait + 2.0
+            ["ros2", "topic", "echo", "--once", topic],
+            capture_output=True, text=True, timeout=wait + 2.0,
+            env=_env(domain_id)
         )
         return r.stdout.strip() or None
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
