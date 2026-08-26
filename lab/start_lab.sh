@@ -95,13 +95,14 @@ case "$MODE" in
 
     gazebo)
         # ── Full physics Gazebo Harmonic sim ──────────────────────────────────
+        echo "[*] Starting Gazebo Harmonic simulation lab..."
+        _source_env
+        # gz binary lives under the ROS2 vendor path — check after sourcing
         command -v gz >/dev/null 2>&1 || {
-            echo "[X] Gazebo not installed."
+            echo "[X] Gazebo not found after sourcing ROS2."
             echo "    Run: ! bash lab/install_gazebo.sh"
             exit 1
         }
-        echo "[*] Starting Gazebo Harmonic simulation lab..."
-        _source_env
 
         # Source ros_gz packages (installed alongside ROS2 Jazzy)
         set +u
@@ -117,8 +118,8 @@ case "$MODE" in
         # Export model path so Gazebo finds model://go2
         export GZ_SIM_RESOURCE_PATH="$SCRIPT_DIR/gz/models${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}"
 
-        echo "[*] Launching Gazebo Harmonic (GUI will open)..."
-        gz sim "$SCRIPT_DIR/gz/worlds/go2_world.sdf" -v 2 &
+        echo "[*] Launching Gazebo Harmonic physics server (headless)..."
+        gz sim -s "$SCRIPT_DIR/gz/worlds/go2_world.sdf" -v 2 &
         GZ_PID=$!
         echo "[*] Waiting 5s for Gazebo to initialize..."
         sleep 5
@@ -134,9 +135,13 @@ case "$MODE" in
         TRANS_PID=$!
 
         echo ""
-        echo "\033[92m[+] Gazebo lab is running\033[0m"
-        echo "    Go2 model spawned — homing to standing position (~3s)"
+        printf "\033[92m[+] Gazebo physics server is running\033[0m\n"
         echo "    PIDs: gz=$GZ_PID  bridge=$BRIDGE_PID  translator=$TRANS_PID"
+        echo ""
+        printf "\033[93m[!] OPEN A DESKTOP TERMINAL and run:\033[0m\n"
+        printf "\033[93m      source /opt/ros/jazzy/setup.bash && gz sim -g\033[0m\n"
+        echo "    This connects the Gazebo GUI to the running physics server."
+        echo "    The Go2 robot will appear, homing to standing position (~3s)."
         echo ""
         echo "    Attack from another terminal (source lab_env.sh first):"
         echo "      python3 $REPO_DIR/ros2reaper.py unitree-recon --unitree-recon-mode full --skip-auth --no-banner"

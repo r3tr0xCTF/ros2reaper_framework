@@ -385,7 +385,7 @@
 
   <!-- Publish joint states to gz transport: /go2/joint_states -->
   <plugin filename="gz-sim-joint-state-publisher-system"
-          name="gz::sim::systems::JointStatePub">
+          name="gz::sim::systems::JointStatePublisher">
     <topic>/go2/joint_states</topic>
     <update_rate>100</update_rate>
   </plugin>
