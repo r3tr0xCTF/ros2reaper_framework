@@ -118,15 +118,14 @@ case "$MODE" in
         # Export model path so Gazebo finds model://go2
         export GZ_SIM_RESOURCE_PATH="$SCRIPT_DIR/gz/models${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}"
 
-        echo "[*] Launching Gazebo Harmonic (server + GUI)..."
-        # On Wayland sessions, unsetting DISPLAY forces Ogre2 to use EGL instead
-        # of GLX, which fails through XWayland.  QT_QPA_PLATFORM=wayland ensures
-        # the Qt frontend also uses the Wayland native backend (not xcb/GLX).
-        DISPLAY="" QT_QPA_PLATFORM=wayland \
-            gz sim "$SCRIPT_DIR/gz/worlds/go2_world.sdf" -v 2 &
+        # Run server headlessly (no Ogre2 needed — Sensors plugin removed).
+        # The GUI is launched separately with Wayland EGL flags so it doesn't
+        # inherit gz-sim's headless-mode PBuffer renderer.
+        echo "[*] Launching Gazebo Harmonic physics server (headless)..."
+        gz sim -s "$SCRIPT_DIR/gz/worlds/go2_world.sdf" -v 2 &
         GZ_PID=$!
-        echo "[*] Waiting 6s for Gazebo to initialize..."
-        sleep 6
+        echo "[*] Waiting 8s for Gazebo to initialize..."
+        sleep 8
 
         echo "[*] Starting ros_gz_bridge..."
         ros2 run ros_gz_bridge parameter_bridge \
@@ -142,7 +141,10 @@ case "$MODE" in
         printf "\033[92m[+] Gazebo physics server is running\033[0m\n"
         echo "    PIDs: gz=$GZ_PID  bridge=$BRIDGE_PID  translator=$TRANS_PID"
         echo ""
-        echo "    Gazebo GUI window should appear (EGL/Wayland rendering)."
+        printf "\033[93m[!] OPEN A DESKTOP TERMINAL and run:\033[0m\n"
+        printf "\033[93m      source /opt/ros/jazzy/setup.bash\033[0m\n"
+        printf "\033[93m      DISPLAY=\"\" QT_QPA_PLATFORM=wayland gz sim -g\033[0m\n"
+        echo "    (Separate GUI process uses windowed EGL, not PBuffer)"
         echo "    The Go2 robot will appear, homing to standing position (~3s)."
         echo ""
         echo "    Attack from another terminal (source lab_env.sh first):"

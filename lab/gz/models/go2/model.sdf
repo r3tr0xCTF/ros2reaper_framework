@@ -38,9 +38,9 @@
     <visual name="trunk_vis">
       <geometry><box><size>0.60 0.28 0.12</size></box></geometry>
       <material>
-        <ambient>0.15 0.15 0.15 1</ambient>
-        <diffuse>0.2 0.2 0.2 1</diffuse>
-        <specular>0.4 0.4 0.4 1</specular>
+        <ambient>0.5 0.5 0.5 1</ambient>
+        <diffuse>0.75 0.75 0.75 1</diffuse>
+        <specular>0.6 0.6 0.6 1</specular>
       </material>
     </visual>
   </link>
@@ -76,7 +76,7 @@
     </inertial>
     <collision name="c"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry></collision>
     <visual name="v"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry>
-      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse></material>
     </visual>
   </link>
   <joint name="FR_thigh_joint" type="revolute">
@@ -96,7 +96,7 @@
     </inertial>
     <collision name="c"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry></collision>
     <visual name="v"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry>
-      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse></material>
     </visual>
   </link>
   <joint name="FR_calf_joint" type="revolute">
@@ -158,7 +158,7 @@
     </inertial>
     <collision name="c"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry></collision>
     <visual name="v"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry>
-      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse></material>
     </visual>
   </link>
   <joint name="FL_thigh_joint" type="revolute">
@@ -178,7 +178,7 @@
     </inertial>
     <collision name="c"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry></collision>
     <visual name="v"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry>
-      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse></material>
     </visual>
   </link>
   <joint name="FL_calf_joint" type="revolute">
@@ -240,7 +240,7 @@
     </inertial>
     <collision name="c"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry></collision>
     <visual name="v"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry>
-      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse></material>
     </visual>
   </link>
   <joint name="RR_thigh_joint" type="revolute">
@@ -260,7 +260,7 @@
     </inertial>
     <collision name="c"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry></collision>
     <visual name="v"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry>
-      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse></material>
     </visual>
   </link>
   <joint name="RR_calf_joint" type="revolute">
@@ -322,7 +322,7 @@
     </inertial>
     <collision name="c"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry></collision>
     <visual name="v"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry>
-      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse></material>
     </visual>
   </link>
   <joint name="RL_thigh_joint" type="revolute">
@@ -342,7 +342,7 @@
     </inertial>
     <collision name="c"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry></collision>
     <visual name="v"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry>
-      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+      <material><ambient>0.4 0.4 0.4 1</ambient><diffuse>0.6 0.6 0.6 1</diffuse></material>
     </visual>
   </link>
   <joint name="RL_calf_joint" type="revolute">
