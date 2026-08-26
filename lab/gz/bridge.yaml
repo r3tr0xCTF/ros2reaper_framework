@@ -1,0 +1,83 @@
+# ros_gz_bridge configuration for the Go2 simulation.
+# Direction: ROS_TO_GZ = ROS2 publisher → Gazebo subscriber
+#            GZ_TO_ROS = Gazebo publisher → ROS2 subscriber
+
+# ── Body velocity (sport API MOVE command) ──────────────────────────────────
+- ros_topic_name: /go2/cmd_vel
+  gz_topic_name: /go2/cmd_vel
+  ros_type_name: geometry_msgs/msg/Twist
+  gz_type_name: gz.msgs.Twist
+  direction: ROS_TO_GZ
+
+# ── Joint velocity commands (12 joints, LowCmd / homing controller) ─────────
+- ros_topic_name: /go2/joint_vel/FR_hip
+  gz_topic_name: /go2/joint_vel/FR_hip
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/FR_thigh
+  gz_topic_name: /go2/joint_vel/FR_thigh
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/FR_calf
+  gz_topic_name: /go2/joint_vel/FR_calf
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/FL_hip
+  gz_topic_name: /go2/joint_vel/FL_hip
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/FL_thigh
+  gz_topic_name: /go2/joint_vel/FL_thigh
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/FL_calf
+  gz_topic_name: /go2/joint_vel/FL_calf
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/RR_hip
+  gz_topic_name: /go2/joint_vel/RR_hip
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/RR_thigh
+  gz_topic_name: /go2/joint_vel/RR_thigh
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/RR_calf
+  gz_topic_name: /go2/joint_vel/RR_calf
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/RL_hip
+  gz_topic_name: /go2/joint_vel/RL_hip
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/RL_thigh
+  gz_topic_name: /go2/joint_vel/RL_thigh
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ
+
+- ros_topic_name: /go2/joint_vel/RL_calf
+  gz_topic_name: /go2/joint_vel/RL_calf
+  ros_type_name: std_msgs/msg/Float64
+  gz_type_name: gz.msgs.Double
+  direction: ROS_TO_GZ

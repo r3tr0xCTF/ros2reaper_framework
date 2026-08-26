@@ -1,0 +1,467 @@
+<?xml version="1.0"?>
+<!--
+  Unitree Go2 simplified simulation model — 12 DoF quadruped.
+  All link poses are in the model frame at the zero-angle configuration.
+  Joint axes are expressed in the model (__model__) frame.
+
+  Leg layout:
+    FR (front-right): x=+0.183, y_hip=-0.047, y_thigh=-0.097
+    FL (front-left):  x=+0.183, y_hip=+0.047, y_thigh=+0.097
+    RR (rear-right):  x=-0.183, y_hip=-0.047, y_thigh=-0.097
+    RL (rear-left):   x=-0.183, y_hip=+0.047, y_thigh=+0.097
+
+  Zero config: all joints=0, legs hanging straight down.
+  Place model trunk at z=0.5 → feet land at ~z=0.075 (just above ground).
+  The translator runs a homing controller → robot reaches standing in ~3s.
+-->
+<sdf version="1.9">
+<model name="go2">
+  <self_collide>false</self_collide>
+  <static>false</static>
+
+  <!-- ═══════════════════════════════════════════════
+       TRUNK
+  ═══════════════════════════════════════════════ -->
+  <link name="trunk">
+    <pose relative_to="__model__">0 0 0 0 0 0</pose>
+    <inertial>
+      <mass>8.0</mass>
+      <inertia>
+        <ixx>0.059</ixx><ixy>0</ixy><ixz>0</ixz>
+        <iyy>0.247</iyy><iyz>0</iyz>
+        <izz>0.292</izz>
+      </inertia>
+    </inertial>
+    <collision name="trunk_col">
+      <geometry><box><size>0.60 0.28 0.12</size></box></geometry>
+    </collision>
+    <visual name="trunk_vis">
+      <geometry><box><size>0.60 0.28 0.12</size></box></geometry>
+      <material>
+        <ambient>0.15 0.15 0.15 1</ambient>
+        <diffuse>0.2 0.2 0.2 1</diffuse>
+        <specular>0.4 0.4 0.4 1</specular>
+      </material>
+    </visual>
+    <!-- IMU sensor on trunk -->
+    <sensor name="imu" type="imu">
+      <always_on>true</always_on>
+      <update_rate>200</update_rate>
+      <topic>/go2/imu</topic>
+    </sensor>
+  </link>
+
+  <!-- ═══════════════════════════════════════════════
+       FR LEG
+  ═══════════════════════════════════════════════ -->
+  <link name="FR_hip">
+    <pose relative_to="__model__">0.183 -0.072 0.000 0 0 0</pose>
+    <inertial><mass>0.5</mass>
+      <inertia><ixx>0.0002</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0005</iyy><iyz>0</iyz><izz>0.0005</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><box><size>0.040 0.050 0.040</size></box></geometry></collision>
+    <visual name="v"><geometry><box><size>0.040 0.050 0.040</size></box></geometry>
+      <material><ambient>0.6 0.3 0.0 1</ambient><diffuse>0.8 0.4 0.0 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="FR_hip_joint" type="revolute">
+    <parent>trunk</parent><child>FR_hip</child>
+    <pose relative_to="__model__">0.183 -0.047 0.000 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">1 0 0</xyz>
+      <limit><lower>-0.80</lower><upper>0.80</upper><effort>23.7</effort><velocity>30.1</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="FR_thigh">
+    <pose relative_to="__model__">0.183 -0.097 -0.100 0 0 0</pose>
+    <inertial><mass>1.0</mass>
+      <inertia><ixx>0.0028</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0028</iyy><iyz>0</iyz><izz>0.00025</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry></collision>
+    <visual name="v"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry>
+      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="FR_thigh_joint" type="revolute">
+    <parent>FR_hip</parent><child>FR_thigh</child>
+    <pose relative_to="__model__">0.183 -0.097 0.000 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">0 1 0</xyz>
+      <limit><lower>-1.57</lower><upper>3.14</upper><effort>23.7</effort><velocity>30.1</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="FR_calf">
+    <pose relative_to="__model__">0.183 -0.097 -0.300 0 0 0</pose>
+    <inertial><mass>0.3</mass>
+      <inertia><ixx>0.0010</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0010</iyy><iyz>0</iyz><izz>0.00003</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry></collision>
+    <visual name="v"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry>
+      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="FR_calf_joint" type="revolute">
+    <parent>FR_thigh</parent><child>FR_calf</child>
+    <pose relative_to="__model__">0.183 -0.097 -0.200 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">0 1 0</xyz>
+      <limit><lower>-2.77</lower><upper>-0.66</upper><effort>35.55</effort><velocity>20.06</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="FR_foot">
+    <pose relative_to="__model__">0.183 -0.097 -0.425 0 0 0</pose>
+    <inertial><mass>0.06</mass>
+      <inertia><ixx>0.000006</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.000006</iyy><iyz>0</iyz><izz>0.000006</izz></inertia>
+    </inertial>
+    <collision name="c">
+      <geometry><sphere><radius>0.025</radius></sphere></geometry>
+      <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+    </collision>
+    <visual name="v"><geometry><sphere><radius>0.025</radius></sphere></geometry>
+      <material><ambient>0.8 0.8 0.8 1</ambient><diffuse>0.9 0.9 0.9 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="FR_foot_joint" type="fixed">
+    <parent>FR_calf</parent><child>FR_foot</child>
+    <pose relative_to="__model__">0.183 -0.097 -0.400 0 0 0</pose>
+  </joint>
+
+  <!-- ═══════════════════════════════════════════════
+       FL LEG
+  ═══════════════════════════════════════════════ -->
+  <link name="FL_hip">
+    <pose relative_to="__model__">0.183 0.072 0.000 0 0 0</pose>
+    <inertial><mass>0.5</mass>
+      <inertia><ixx>0.0002</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0005</iyy><iyz>0</iyz><izz>0.0005</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><box><size>0.040 0.050 0.040</size></box></geometry></collision>
+    <visual name="v"><geometry><box><size>0.040 0.050 0.040</size></box></geometry>
+      <material><ambient>0.6 0.3 0.0 1</ambient><diffuse>0.8 0.4 0.0 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="FL_hip_joint" type="revolute">
+    <parent>trunk</parent><child>FL_hip</child>
+    <pose relative_to="__model__">0.183 0.047 0.000 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">1 0 0</xyz>
+      <limit><lower>-0.80</lower><upper>0.80</upper><effort>23.7</effort><velocity>30.1</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="FL_thigh">
+    <pose relative_to="__model__">0.183 0.097 -0.100 0 0 0</pose>
+    <inertial><mass>1.0</mass>
+      <inertia><ixx>0.0028</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0028</iyy><iyz>0</iyz><izz>0.00025</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry></collision>
+    <visual name="v"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry>
+      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="FL_thigh_joint" type="revolute">
+    <parent>FL_hip</parent><child>FL_thigh</child>
+    <pose relative_to="__model__">0.183 0.097 0.000 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">0 1 0</xyz>
+      <limit><lower>-1.57</lower><upper>3.14</upper><effort>23.7</effort><velocity>30.1</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="FL_calf">
+    <pose relative_to="__model__">0.183 0.097 -0.300 0 0 0</pose>
+    <inertial><mass>0.3</mass>
+      <inertia><ixx>0.0010</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0010</iyy><iyz>0</iyz><izz>0.00003</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry></collision>
+    <visual name="v"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry>
+      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="FL_calf_joint" type="revolute">
+    <parent>FL_thigh</parent><child>FL_calf</child>
+    <pose relative_to="__model__">0.183 0.097 -0.200 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">0 1 0</xyz>
+      <limit><lower>-2.77</lower><upper>-0.66</upper><effort>35.55</effort><velocity>20.06</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="FL_foot">
+    <pose relative_to="__model__">0.183 0.097 -0.425 0 0 0</pose>
+    <inertial><mass>0.06</mass>
+      <inertia><ixx>0.000006</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.000006</iyy><iyz>0</iyz><izz>0.000006</izz></inertia>
+    </inertial>
+    <collision name="c">
+      <geometry><sphere><radius>0.025</radius></sphere></geometry>
+      <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+    </collision>
+    <visual name="v"><geometry><sphere><radius>0.025</radius></sphere></geometry>
+      <material><ambient>0.8 0.8 0.8 1</ambient><diffuse>0.9 0.9 0.9 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="FL_foot_joint" type="fixed">
+    <parent>FL_calf</parent><child>FL_foot</child>
+    <pose relative_to="__model__">0.183 0.097 -0.400 0 0 0</pose>
+  </joint>
+
+  <!-- ═══════════════════════════════════════════════
+       RR LEG
+  ═══════════════════════════════════════════════ -->
+  <link name="RR_hip">
+    <pose relative_to="__model__">-0.183 -0.072 0.000 0 0 0</pose>
+    <inertial><mass>0.5</mass>
+      <inertia><ixx>0.0002</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0005</iyy><iyz>0</iyz><izz>0.0005</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><box><size>0.040 0.050 0.040</size></box></geometry></collision>
+    <visual name="v"><geometry><box><size>0.040 0.050 0.040</size></box></geometry>
+      <material><ambient>0.6 0.3 0.0 1</ambient><diffuse>0.8 0.4 0.0 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="RR_hip_joint" type="revolute">
+    <parent>trunk</parent><child>RR_hip</child>
+    <pose relative_to="__model__">-0.183 -0.047 0.000 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">1 0 0</xyz>
+      <limit><lower>-0.80</lower><upper>0.80</upper><effort>23.7</effort><velocity>30.1</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="RR_thigh">
+    <pose relative_to="__model__">-0.183 -0.097 -0.100 0 0 0</pose>
+    <inertial><mass>1.0</mass>
+      <inertia><ixx>0.0028</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0028</iyy><iyz>0</iyz><izz>0.00025</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry></collision>
+    <visual name="v"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry>
+      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="RR_thigh_joint" type="revolute">
+    <parent>RR_hip</parent><child>RR_thigh</child>
+    <pose relative_to="__model__">-0.183 -0.097 0.000 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">0 1 0</xyz>
+      <limit><lower>-1.57</lower><upper>3.14</upper><effort>23.7</effort><velocity>30.1</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="RR_calf">
+    <pose relative_to="__model__">-0.183 -0.097 -0.300 0 0 0</pose>
+    <inertial><mass>0.3</mass>
+      <inertia><ixx>0.0010</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0010</iyy><iyz>0</iyz><izz>0.00003</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry></collision>
+    <visual name="v"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry>
+      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="RR_calf_joint" type="revolute">
+    <parent>RR_thigh</parent><child>RR_calf</child>
+    <pose relative_to="__model__">-0.183 -0.097 -0.200 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">0 1 0</xyz>
+      <limit><lower>-2.77</lower><upper>-0.66</upper><effort>35.55</effort><velocity>20.06</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="RR_foot">
+    <pose relative_to="__model__">-0.183 -0.097 -0.425 0 0 0</pose>
+    <inertial><mass>0.06</mass>
+      <inertia><ixx>0.000006</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.000006</iyy><iyz>0</iyz><izz>0.000006</izz></inertia>
+    </inertial>
+    <collision name="c">
+      <geometry><sphere><radius>0.025</radius></sphere></geometry>
+      <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+    </collision>
+    <visual name="v"><geometry><sphere><radius>0.025</radius></sphere></geometry>
+      <material><ambient>0.8 0.8 0.8 1</ambient><diffuse>0.9 0.9 0.9 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="RR_foot_joint" type="fixed">
+    <parent>RR_calf</parent><child>RR_foot</child>
+    <pose relative_to="__model__">-0.183 -0.097 -0.400 0 0 0</pose>
+  </joint>
+
+  <!-- ═══════════════════════════════════════════════
+       RL LEG
+  ═══════════════════════════════════════════════ -->
+  <link name="RL_hip">
+    <pose relative_to="__model__">-0.183 0.072 0.000 0 0 0</pose>
+    <inertial><mass>0.5</mass>
+      <inertia><ixx>0.0002</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0005</iyy><iyz>0</iyz><izz>0.0005</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><box><size>0.040 0.050 0.040</size></box></geometry></collision>
+    <visual name="v"><geometry><box><size>0.040 0.050 0.040</size></box></geometry>
+      <material><ambient>0.6 0.3 0.0 1</ambient><diffuse>0.8 0.4 0.0 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="RL_hip_joint" type="revolute">
+    <parent>trunk</parent><child>RL_hip</child>
+    <pose relative_to="__model__">-0.183 0.047 0.000 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">1 0 0</xyz>
+      <limit><lower>-0.80</lower><upper>0.80</upper><effort>23.7</effort><velocity>30.1</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="RL_thigh">
+    <pose relative_to="__model__">-0.183 0.097 -0.100 0 0 0</pose>
+    <inertial><mass>1.0</mass>
+      <inertia><ixx>0.0028</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0028</iyy><iyz>0</iyz><izz>0.00025</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry></collision>
+    <visual name="v"><geometry><capsule><radius>0.022</radius><length>0.156</length></capsule></geometry>
+      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="RL_thigh_joint" type="revolute">
+    <parent>RL_hip</parent><child>RL_thigh</child>
+    <pose relative_to="__model__">-0.183 0.097 0.000 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">0 1 0</xyz>
+      <limit><lower>-1.57</lower><upper>3.14</upper><effort>23.7</effort><velocity>30.1</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="RL_calf">
+    <pose relative_to="__model__">-0.183 0.097 -0.300 0 0 0</pose>
+    <inertial><mass>0.3</mass>
+      <inertia><ixx>0.0010</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.0010</iyy><iyz>0</iyz><izz>0.00003</izz></inertia>
+    </inertial>
+    <collision name="c"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry></collision>
+    <visual name="v"><geometry><capsule><radius>0.013</radius><length>0.156</length></capsule></geometry>
+      <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.15 0.15 0.15 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="RL_calf_joint" type="revolute">
+    <parent>RL_thigh</parent><child>RL_calf</child>
+    <pose relative_to="__model__">-0.183 0.097 -0.200 0 0 0</pose>
+    <axis><xyz expressed_in="__model__">0 1 0</xyz>
+      <limit><lower>-2.77</lower><upper>-0.66</upper><effort>35.55</effort><velocity>20.06</velocity></limit>
+      <dynamics><damping>0.01</damping><friction>0.2</friction></dynamics>
+    </axis>
+  </joint>
+
+  <link name="RL_foot">
+    <pose relative_to="__model__">-0.183 0.097 -0.425 0 0 0</pose>
+    <inertial><mass>0.06</mass>
+      <inertia><ixx>0.000006</ixx><ixy>0</ixy><ixz>0</ixz>
+               <iyy>0.000006</iyy><iyz>0</iyz><izz>0.000006</izz></inertia>
+    </inertial>
+    <collision name="c">
+      <geometry><sphere><radius>0.025</radius></sphere></geometry>
+      <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+    </collision>
+    <visual name="v"><geometry><sphere><radius>0.025</radius></sphere></geometry>
+      <material><ambient>0.8 0.8 0.8 1</ambient><diffuse>0.9 0.9 0.9 1</diffuse></material>
+    </visual>
+  </link>
+  <joint name="RL_foot_joint" type="fixed">
+    <parent>RL_calf</parent><child>RL_foot</child>
+    <pose relative_to="__model__">-0.183 0.097 -0.400 0 0 0</pose>
+  </joint>
+
+  <!-- ═══════════════════════════════════════════════
+       PLUGINS
+  ═══════════════════════════════════════════════ -->
+
+  <!-- Publish joint states to gz transport: /go2/joint_states -->
+  <plugin filename="gz-sim-joint-state-publisher-system"
+          name="gz::sim::systems::JointStatePub">
+    <topic>/go2/joint_states</topic>
+    <update_rate>100</update_rate>
+  </plugin>
+
+  <!-- Body velocity control: /go2/cmd_vel (Twist) → applied to trunk -->
+  <plugin filename="gz-sim-velocity-control-system"
+          name="gz::sim::systems::VelocityControl">
+    <topic>/go2/cmd_vel</topic>
+  </plugin>
+
+  <!-- ── 12 Joint Controllers (velocity mode) ── -->
+  <!-- Each topic receives a gz.msgs.Double (rad/s velocity target) -->
+
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>FR_hip_joint</joint_name>
+    <topic>/go2/joint_vel/FR_hip</topic>
+  </plugin>
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>FR_thigh_joint</joint_name>
+    <topic>/go2/joint_vel/FR_thigh</topic>
+  </plugin>
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>FR_calf_joint</joint_name>
+    <topic>/go2/joint_vel/FR_calf</topic>
+  </plugin>
+
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>FL_hip_joint</joint_name>
+    <topic>/go2/joint_vel/FL_hip</topic>
+  </plugin>
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>FL_thigh_joint</joint_name>
+    <topic>/go2/joint_vel/FL_thigh</topic>
+  </plugin>
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>FL_calf_joint</joint_name>
+    <topic>/go2/joint_vel/FL_calf</topic>
+  </plugin>
+
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>RR_hip_joint</joint_name>
+    <topic>/go2/joint_vel/RR_hip</topic>
+  </plugin>
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>RR_thigh_joint</joint_name>
+    <topic>/go2/joint_vel/RR_thigh</topic>
+  </plugin>
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>RR_calf_joint</joint_name>
+    <topic>/go2/joint_vel/RR_calf</topic>
+  </plugin>
+
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>RL_hip_joint</joint_name>
+    <topic>/go2/joint_vel/RL_hip</topic>
+  </plugin>
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>RL_thigh_joint</joint_name>
+    <topic>/go2/joint_vel/RL_thigh</topic>
+  </plugin>
+  <plugin filename="gz-sim-joint-controller-system"
+          name="gz::sim::systems::JointController">
+    <joint_name>RL_calf_joint</joint_name>
+    <topic>/go2/joint_vel/RL_calf</topic>
+  </plugin>
+
+</model>
+</sdf>

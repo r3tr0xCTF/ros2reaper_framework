@@ -93,13 +93,76 @@ case "$MODE" in
         tmux attach-session -t "$SESSION"
         ;;
 
+    gazebo)
+        # ── Full physics Gazebo Harmonic sim ──────────────────────────────────
+        command -v gz >/dev/null 2>&1 || {
+            echo "[X] Gazebo not installed."
+            echo "    Run: ! bash lab/install_gazebo.sh"
+            exit 1
+        }
+        echo "[*] Starting Gazebo Harmonic simulation lab..."
+        _source_env
+
+        # Source ros_gz packages (installed alongside ROS2 Jazzy)
+        set +u
+        for gz_setup in /opt/ros/jazzy/share/ros_gz_sim/cmake/../../../setup.bash \
+                        /opt/ros/jazzy/setup.bash; do
+            [ -f "$gz_setup" ] && source "$gz_setup" && break
+        done
+        set -u
+
+        echo "[*] Flushing ROS2 daemon..."
+        ros2 daemon stop 2>/dev/null; sleep 1; ros2 daemon start 2>/dev/null; sleep 1
+
+        # Export model path so Gazebo finds model://go2
+        export GZ_SIM_RESOURCE_PATH="$SCRIPT_DIR/gz/models${GZ_SIM_RESOURCE_PATH:+:$GZ_SIM_RESOURCE_PATH}"
+
+        echo "[*] Launching Gazebo Harmonic (GUI will open)..."
+        gz sim "$SCRIPT_DIR/gz/worlds/go2_world.sdf" -v 2 &
+        GZ_PID=$!
+        echo "[*] Waiting 5s for Gazebo to initialize..."
+        sleep 5
+
+        echo "[*] Starting ros_gz_bridge..."
+        ros2 run ros_gz_bridge parameter_bridge \
+            --ros-args -p config_file:="$SCRIPT_DIR/gz/bridge.yaml" &
+        BRIDGE_PID=$!
+        sleep 2
+
+        echo "[*] Starting Unitree↔Gazebo translator (homing controller + attack listener)..."
+        python3 "$SCRIPT_DIR/unitree_gz_translator.py" &
+        TRANS_PID=$!
+
+        echo ""
+        echo "\033[92m[+] Gazebo lab is running\033[0m"
+        echo "    Go2 model spawned — homing to standing position (~3s)"
+        echo "    PIDs: gz=$GZ_PID  bridge=$BRIDGE_PID  translator=$TRANS_PID"
+        echo ""
+        echo "    Attack from another terminal (source lab_env.sh first):"
+        echo "      python3 $REPO_DIR/ros2reaper.py unitree-recon --unitree-recon-mode full --skip-auth --no-banner"
+        echo "      python3 $REPO_DIR/ros2reaper.py unitree-api --unitree-api-mode damp --skip-auth --no-banner"
+        echo "      python3 $REPO_DIR/ros2reaper.py unitree-sport --unitree-sport-mode velocity_lock --sport-vx 0.5 --duration 10 --skip-auth --no-banner"
+        echo "      python3 $REPO_DIR/ros2reaper.py unitree-lowcmd --lowcmd-mode damp --robot-model go2 --skip-auth --no-banner"
+        echo ""
+        echo "    Ctrl+C to stop all processes."
+        echo ""
+
+        # Wait for Gazebo to exit (user closes the window)
+        trap "echo '[*] Stopping...'; kill $BRIDGE_PID $TRANS_PID 2>/dev/null; wait $GZ_PID 2>/dev/null" INT TERM
+        wait $GZ_PID
+        kill $BRIDGE_PID $TRANS_PID 2>/dev/null
+        echo "[+] Gazebo lab stopped."
+        ;;
+
     *)
         echo "Usage: $0 target [--model go2|g1|b2|h1] [--domain-id 0] [--verbose]"
         echo "       $0 attacker"
         echo "       $0 tmux [model]"
+        echo "       $0 gazebo"
         echo ""
-        echo "  target   — start the mock Unitree robot (the attack target)"
+        echo "  target   — start the mock Unitree robot (the DDS-only attack target)"
         echo "  attacker — source env and open attacker shell"
         echo "  tmux     — open both panes automatically in tmux"
+        echo "  gazebo   — full Gazebo Harmonic physics sim (robot visually responds to attacks)"
         ;;
 esac
