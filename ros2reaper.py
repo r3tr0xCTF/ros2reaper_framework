@@ -2111,6 +2111,150 @@ def cmd_mavros_bridge(args):
 
 
 # =============================================================================
+# DRONEmapper Integration
+# =============================================================================
+
+def cmd_dronemapper_recon(args):
+    """
+    Enrich DDS discovery with saviorSEC DRONEmapper datasets.
+
+    Modes:
+      update   — download / refresh cached datasets (~600KB total without devices)
+      enrich   — discover DDS participants + enrich via OUI/ARP lookup (default)
+      oui      — look up a single MAC OUI prefix (--mac-oui AA:BB:CC)
+      rid      — look up a Remote ID serial number (--rid-serial XXXXX)
+      live     — query a local DRONEmapper server (--dm-server URL)
+    """
+    from modules.dronemapper import (
+        DroneMapperDB,
+        print_enrichment_report,
+        print_oui_result,
+        print_rid_results,
+        export_json as dm_export,
+    )
+
+    mode       = getattr(args, "dm_mode", None) or "enrich"
+    dm_server  = getattr(args, "dm_server", "http://127.0.0.1:8780")
+    mac_oui    = getattr(args, "mac_oui", None)
+    rid_serial = getattr(args, "rid_serial", None)
+    load_devs  = getattr(args, "load_devices", False)
+
+    db = DroneMapperDB(verbose=args.verbose)
+
+    # --- update: just refresh the cache ---
+    if mode == "update":
+        datasets = ["oui", "rid", "rf"]
+        if load_devs:
+            datasets.append("devices")
+        print(f"[*] Refreshing DRONEmapper datasets → {str(db.CACHE_DIR if hasattr(db, 'CACHE_DIR') else '~/.cache/ros2reaper/dronemapper/')}")
+        db.update(force=True, datasets=datasets)
+        return
+
+    # --- oui: single MAC OUI lookup ---
+    if mode == "oui":
+        if not mac_oui:
+            print("[-] --mac-oui required for oui mode (e.g. --mac-oui AA:BB:CC)")
+            return
+        db.ensure_loaded(["oui"])
+        match = db.lookup_oui(mac_oui)
+        print_oui_result(match, mac_oui)
+        return
+
+    # --- rid: Remote ID serial lookup ---
+    if mode == "rid":
+        if not rid_serial:
+            print("[-] --rid-serial required for rid mode")
+            return
+        db.ensure_loaded(["rid"])
+        matches = db.lookup_rid(rid_serial)
+        print_rid_results(matches, rid_serial)
+        if args.output and matches:
+            import json as _json
+            with open(args.output, "w") as f:
+                _json.dump([{
+                    "manufacturer": m.manufacturer,
+                    "model": m.model,
+                    "device_type": m.device_type,
+                    "rule_id": m.rule_id,
+                    "evidence_url": m.evidence_url,
+                } for m in matches], f, indent=2)
+            print(f"  [*] Results saved to {args.output}")
+        return
+
+    # --- live: query local DRONEmapper server ---
+    if mode == "live":
+        print(f"[*] Querying DRONEmapper server at {dm_server}...")
+        data = db.query_live_server(server_url=dm_server)
+        if data:
+            import json as _json
+            print(f"[+] Server response:")
+            print(_json.dumps(data, indent=2)[:4000])
+            if args.output:
+                with open(args.output, "w") as f:
+                    _json.dump(data, f, indent=2)
+                print(f"[*] Live data saved to {args.output}")
+        else:
+            print("[-] No data returned from DRONEmapper server")
+            print("    Start the server with: python3 server.py")
+            print("    (clone https://github.com/ekomsSavior/DRONEmapper first)")
+        return
+
+    # --- enrich (default): discover DDS + OUI enrichment ---
+    db.ensure_loaded(["oui"])
+    if load_devs:
+        db.ensure_loaded(["devices"])
+
+    scanner = RTPSScanner(timeout=args.timeout, verbose=args.verbose)
+
+    print("[*] Discovering DDS participants...")
+    if args.network:
+        result = scanner.network_scan(
+            network=args.network,
+            domain_id=args.domain_id,
+            timeout=args.timeout,
+        )
+        participants = result.participants
+    elif args.target:
+        participants = scanner.spdp_probe(
+            target=args.target,
+            domain_id=args.domain_id,
+            timeout=args.timeout,
+        )
+    else:
+        print("[*] No target specified — sending multicast SPDP probe on local network")
+        participants = scanner.spdp_probe(
+            domain_id=args.domain_id,
+            timeout=args.timeout,
+        )
+
+    if not participants:
+        print("[-] No DDS participants discovered")
+        return
+
+    print(f"[+] {len(participants)} participant(s) found — enriching with DRONEmapper OUI data...")
+
+    enrichments = []
+    seen_ips: set = set()
+    for p in participants:
+        ip = p.source_ip or ""
+        if not ip or ip in seen_ips:
+            continue
+        seen_ips.add(ip)
+        enrich = db.enrich_participant_ip(ip)
+
+        # Also stamp participant info into the enrichment for context
+        if not enrich.oui_match and args.verbose:
+            print(f"  [-] {ip}: no OUI match (not a reviewed drone/robot manufacturer)")
+
+        enrichments.append(enrich)
+
+    print_enrichment_report(enrichments)
+
+    if args.output:
+        dm_export(enrichments, args.output)
+
+
+# =============================================================================
 # Output Formatters
 # =============================================================================
 
@@ -2471,11 +2615,13 @@ Examples:
                                  "ai-extract", "ai-poison",
                                  # Phase 7: Physical Robot Targeting (Unitree)
                                  "unitree-recon", "unitree-api",
-                                 "unitree-lowcmd", "unitree-sport"],
+                                 "unitree-lowcmd", "unitree-sport",
                                  # Phase 7: MAVLink / Autopilot Security
                                  "mavlink-discover", "mavlink-enum",
                                  "mavlink-sniff", "mavlink-inject",
-                                 "mavlink-audit", "mavros-bridge"],
+                                 "mavlink-audit", "mavros-bridge",
+                                 # DRONEmapper Integration
+                                 "dronemapper-recon"],
                         help="Command to execute")
 
     # Target options
@@ -2913,6 +3059,20 @@ Examples:
     parser.add_argument("--force", action="store_true",
                         help="Force arm/disarm (bypass safety checks)")
 
+    # DRONEmapper integration options
+    parser.add_argument("--dm-mode",
+                        choices=["update", "enrich", "oui", "rid", "live"],
+                        default="enrich", dest="dm_mode",
+                        help="dronemapper-recon mode: update, enrich (default), oui, rid, live")
+    parser.add_argument("--dm-server", default="http://127.0.0.1:8780", dest="dm_server",
+                        help="DRONEmapper local server URL (default: http://127.0.0.1:8780)")
+    parser.add_argument("--mac-oui", default=None, dest="mac_oui",
+                        help="dronemapper-recon oui: MAC OUI to look up (e.g. AA:BB:CC)")
+    parser.add_argument("--rid-serial", default=None, dest="rid_serial",
+                        help="dronemapper-recon rid: Remote ID serial number to look up")
+    parser.add_argument("--load-devices", action="store_true", dest="load_devices",
+                        help="dronemapper-recon: also load devices-global.json (19MB, slow)")
+
     # Output options
     parser.add_argument("-o", "--output", help="Output file path (JSON)")
     parser.add_argument("-v", "--verbose", action="store_true",
@@ -3001,6 +3161,8 @@ Examples:
         "mavlink-inject":   cmd_mavlink_inject,
         "mavlink-audit":    cmd_mavlink_audit,
         "mavros-bridge":    cmd_mavros_bridge,
+        # DRONEmapper Integration
+        "dronemapper-recon": cmd_dronemapper_recon,
     }
 
     try:

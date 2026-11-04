@@ -115,6 +115,9 @@ PHASES = [
         ("unitree-lowcmd", "Direct motor control (LowCmd inject)"),
         ("unitree-sport",  "Continuous sport mode hijacking"),
     ]),
+    ("DRONEMAPPER", [
+        ("dronemapper-recon", "Enrich DDS discovery with drone/robot intel"),
+    ]),
 ]
 
 # Argument definitions: (flag, label, type, default, choices/help)
@@ -301,6 +304,14 @@ ARG_DEFS = {
                           ["enumerate", "velocity_lock", "emergency_freeze",
                            "damp_loop", "gait_force", "spoof_state"]),
 
+    # DRONEmapper
+    "dm_mode":      ("--dm-mode",      "Mode",                   "choice", "enrich",
+                     ["update", "enrich", "oui", "rid", "live"]),
+    "dm_server":    ("--dm-server",    "DRONEmapper server URL", "str",    "http://127.0.0.1:8780", None),
+    "mac_oui":      ("--mac-oui",      "MAC / OUI (AA:BB:CC)",   "str",    "", None),
+    "rid_serial":   ("--rid-serial",   "Remote ID serial",       "str",    "", None),
+    "load_devices": ("--load-devices", "Load device catalog (19 MB)", "bool", False, None),
+
     # Phase 6
     "ai_enum_mode":     ("--ai-enum-mode",     "Enum scope",      "choice", "",
                          ["all", "triton", "tf_serving", "onnx_rt",
@@ -431,6 +442,10 @@ CMD_ARGS = {
     "unitree-sport":  ["domain_id", "unitree_sport_mode",
                        "sport_vx", "sport_vy", "sport_vyaw",
                        "sport_gait", "sport_rate", "duration", "output", "verbose"],
+
+    "dronemapper-recon": ["dm_mode", "target", "network", "domain_id", "timeout",
+                          "dm_server", "mac_oui", "rid_serial", "load_devices",
+                          "output", "verbose"],
 
     "ai-enum":    ["target", "ai_enum_mode", "ai_ports", "ai_fs_paths", "verbose"],
     "ai-perturb": ["target", "perturb_mode", "adv_epsilon", "adv_input", "adv_output",
